@@ -36,6 +36,15 @@ sinteticos:
   paises: [EC, CO, PE, US, ES, MX]
   monto_maximo: 5000
 
+# Lote de demostracion (docs/spec.md, seccion 12; ADR 0014): lo envian `demostrar` y la pagina.
+# Sale de la parte de PRUEBA (fraudes y no fraudes), mas las sinteticas de ubicacion y unas
+# entradas invalidas fijas. Con la muestra no es reportable.
+demostracion:
+  semilla: 2027
+  fraudes: 20               # como maximo; la muestra tiene menos en su parte de prueba
+  legitimas: 80
+  sinteticas: 20            # las primeras de datos/sinteticos/ubicacion.json
+
 # Isolation Forest (docs/spec.md, seccion 11). Parametros iniciales: los del articulo original
 # (Liu, Ting y Zhou, 2008) y por defecto en scikit-learn. Se entrena con la parte de ajuste.
 isolation_forest:

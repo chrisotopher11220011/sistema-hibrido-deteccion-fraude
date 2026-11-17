@@ -14,6 +14,7 @@ ERROR = "error_evaluacion"
 PRIORITARIA = "alerta_prioritaria"
 REVISION = "revision_recomendada"
 SIN_ALERTA = "sin_alerta"
+NIVELES = (ERROR, PRIORITARIA, REVISION, SIN_ALERTA)
 
 
 def _nivel(r_alto: bool, r: bool, a: bool, a_alta: bool) -> str:
