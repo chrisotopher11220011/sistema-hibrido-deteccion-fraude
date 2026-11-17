@@ -6,7 +6,7 @@ No bloquea operaciones reales ni está pensado para producción. El sistema señ
 
 ## Estado
 
-**Versión 0.2.0 — Fase 2, datos y reglas.** Además de los cimientos de la fase 1 (arranque con un comando, API con `/salud`, n8n con el flujo `ping`, evidencia e integración continua), existen la preparación de los datos (descarga verificada, partición y análisis exploratorio), el motor de reglas deterministas y los datos sintéticos de ubicación. Todavía **no hay** modelo ni página de simulación, y por tanto no hay ninguna cifra de desempeño.
+**Versión 0.3.0 — Fase 3, aprendizaje automático.** Además de los cimientos (fase 1) y de los datos y las reglas (fase 2), existen el entrenamiento de Isolation Forest, la elección de umbrales en validación, la contribución por variable con SHAP y la evaluación con el protocolo de la sección 15 (cuatro configuraciones, tres líneas base, intervalos de confianza, diez semillas y partición temporal). Todavía **no hay** página de simulación ni flujo de evaluación en n8n. Las cifras de desempeño solo existirán cuando se ejecute con los datos reales en el computador de ejecución (N3): lo calculado en la CI usa la muestra para pruebas y no es un resultado.
 
 El avance detallado está en [`docs/ESTADO.md`](docs/ESTADO.md) y los cambios en [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -27,6 +27,8 @@ La guía paso a paso, con lo que debería verse en cada momento, está en [`EJEC
 | `./fraude todo` | Arranca los servicios, ejecuta los pasos que existen y reúne la evidencia |
 | `./fraude todo --muestra` | Lo mismo con datos de prueba generados, sin descargar el conjunto real (sus cifras no se reportan) |
 | `./fraude preparar` | Solo el paso de datos: descarga, verificación, partición y análisis exploratorio |
+| `./fraude entrenar` | Entrena Isolation Forest con la parte de ajuste y elige los umbrales en validación |
+| `./fraude evaluar` | Métricas sobre la parte de prueba, comparativa, figuras y análisis de errores de validación |
 | `./fraude evidencia` | Reúne de nuevo la evidencia |
 | `./fraude abrir` | Abre la página en el navegador |
 | `./fraude estado` | Dice qué servicios están en marcha |

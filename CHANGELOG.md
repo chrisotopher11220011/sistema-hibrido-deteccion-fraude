@@ -6,6 +6,28 @@ Cada entrada indica su nivel de verificación: N1 (entorno de desarrollo), N2 (G
 
 ## [Sin publicar]
 
+## [0.3.0] - 2026-11-17
+
+Fase 3, aprendizaje automático. Todo lo comprobado aquí usa la muestra para pruebas: confirma que el procedimiento funciona, no mide la detección de fraude. Las cifras reales salen solo de N3 (punto de prueba B).
+
+### Añadido
+
+- Paso `entrenar` (`./fraude entrenar`, y dentro de `todo`): Isolation Forest con la parte de ajuste y sin etiquetas; `umbral_revision` por F1 y `umbral_prioritaria` por F0,5 en validación; artefacto con huella en `datos/modelo/` y `modelo.json` con parámetros, umbrales, huellas de datos y partición, versiones y tiempos (N1; N2 con la muestra).
+- Paso `evaluar`: cuatro configuraciones y tres líneas base sobre la parte de prueba, con matriz de confusión, precisión, exhaustividad y F1; precisión media, precisión en los 100 primeros y AUC ROC complementaria; intervalos del 95 % por *bootstrap* estratificado con 1.000 remuestreos; diferencias pareadas; diez semillas; partición temporal secundaria (omitida y anotada si falta `Time`) (N1; N2 con la muestra).
+- `metricas.json`, `comparativa.md`, cuatro figuras siguiendo la skill `dataviz` y `analisis_errores/` de la parte de validación con las variables que más pesaron (N1; N2 con la muestra).
+- Contribución por variable con SHAP para árboles, con prueba de aditividad (ADR 0012) (N1; N2).
+- Copia en Python de la tabla de decisión de la sección 8.4 (N1).
+- `docs/fugas.md`: fuentes de fuga habituales y por qué no aplican.
+- La evidencia copia `modelo.json`, `metricas.json`, `comparativa.md`, `figuras/` y `analisis_errores/`, y el resumen dice si son de la muestra (N1; N2).
+
+### Cambiado
+
+- Dependencia nueva: `shap` 0.54.1.
+- `config/modelo.yaml` añade `isolation_forest`, `contribuciones` y `evaluacion`.
+- `entrenar` y `evaluar` dejan de avisar de su fase; `demostrar` sigue llegando en la fase 5.
+- Una sesión nueva de `./fraude todo` no arrastra los archivos de modelo y evaluación de la anterior.
+- El estilo común de las figuras pasa a `src/fraude/graficas.py`.
+
 ## [0.2.0] - 2026-11-17
 
 Fase 2, datos y reglas. Sin modelo ni métricas todavía: todo lo comprobado aquí usa la muestra para pruebas o datos sintéticos, que no representan el fraude real.

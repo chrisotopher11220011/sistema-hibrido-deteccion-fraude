@@ -2,7 +2,7 @@
 
 Esta guía es para quien ejecuta el sistema en su computador. No hace falta saber programar ni instalar nada: Omarchy 4 ya trae Docker, Docker Compose, Git y el navegador.
 
-**Versión 0.2.0.** Comprueba que el sistema arranca en tu equipo (punto de prueba A) y, además, descarga y prepara los datos del proyecto. Toma unos cinco minutos, más las descargas de la primera vez (imágenes de Docker y unos 150 MB de datos). Aún no hay página de simulación ni detección de fraude.
+**Versión 0.3.0 — punto de prueba B.** Comprueba que el sistema arranca en tu equipo, descarga los datos reales, entrena el modelo de detección de anomalías (Isolation Forest) y calcula las primeras métricas. Toma unos diez minutos, más las descargas de la primera vez (imágenes de Docker y unos 150 MB de datos). Aún no hay página de simulación.
 
 ## Antes de empezar
 
@@ -33,7 +33,7 @@ cd sistema-hibrido-deteccion-fraude
 1. `Docker pide permisos de administrador (es lo normal en Omarchy 4).` y después la petición de tu contraseña. Al escribirla no se ve nada en pantalla; es normal.
 2. `Paso 1 de 3: construir y arrancar los servicios (api y n8n).` Aquí se descargan las imágenes. La primera vez puede tardar varios minutos; las siguientes, menos de uno.
 3. `Servicios en marcha: la API y n8n responden.`
-4. `Paso 2 de 3: ejecutar los pasos del proyecto.` Primero `[preparar] Descargando el conjunto de OpenML (unos 150 MB)...` y, al terminar, una línea como `[preparar] Listo. Fuente openml: 284807 transacciones, 492 fraudes; particion creada.` Si la columna `Time` no llega, verás un `AVISO` sobre ella: es esperable y el paso sigue. Los demás pasos solo avisan de que llegan en una fase posterior.
+4. `Paso 2 de 3: ejecutar los pasos del proyecto.` Primero `[preparar] Descargando el conjunto de OpenML (unos 150 MB)...` y, al terminar, una línea como `[preparar] Listo. Fuente openml: 284807 transacciones, 492 fraudes; particion creada.` Si la columna `Time` no llega, verás un `AVISO` sobre ella: es esperable y el paso sigue. Después `[entrenar] Listo. Modelo ...; umbrales elegidos en validacion (modelo.json).` (unos segundos) y `[evaluar] Listo. Protocolo de la seccion 15 en ... s: ...` (uno o dos minutos: repite el entrenamiento con diez semillas y hace mil remuestreos). El paso `demostrar` solo avisa de que llega en la fase 5.
 5. `Paso 3 de 3: evidencia.` y una línea como `Evidencia lista: resultados/20261117T153000Z_ab12cd3/ y resultados/20261117T153000Z_ab12cd3.zip`.
 6. `Todo termino bien.`
 
@@ -83,6 +83,9 @@ Si quieres, haz una captura con `Print Screen`. Se guarda sola en `~/Pictures/Sc
 | ¿Los puertos 8000 y 5678 estaban libres? | `anfitrion.json` y `errores.json` |
 | ¿Los contenedores salen a internet y OpenML entrega el conjunto esperado? | `datos.json`: 284.807 transacciones y 492 fraudes |
 | ¿Cómo es el conjunto en la parte de ajuste? | `eda/` (resumen y figuras) |
+| ¿El entrenamiento termina en minutos y cabe en tu equipo? | `modelo.json`: `tiempo_entrenamiento_s`; `metricas.json`: `duracion_s` |
+| ¿Qué tal detectan las reglas, el modelo y el híbrido? | `comparativa.md`, `metricas.json` y `figuras/` (parte de prueba) |
+| ¿Qué fraudes se escapan y qué falsas alarmas hay? | `analisis_errores/` (parte de validación) |
 
 ## Si algo va mal
 
@@ -94,6 +97,7 @@ Si quieres, haz una captura con `Print Screen`. Se guarda sola en `~/Pictures/Sc
 | `[preparar] ERROR` por conteos, suma MD5 o huella | No borres nada. Ejecuta `./fraude evidencia` y envía el `.zip`: `datos.json` dice qué no coincidió |
 | Un mensaje de que el puerto 8000 o 5678 ya está en uso | Usa otros puertos. Escribe una vez `export FRAUDE_PUERTO_API=8010 FRAUDE_PUERTO_N8N=5690` y, en esa misma terminal, repite `./fraude todo`. Las demás órdenes (`estado`, `abrir`, `evidencia`, `apagar`) deben ejecutarse en esa misma terminal |
 | Se queda mucho tiempo en el paso 1 | La primera descarga depende de tu conexión. Si n8n no responde pasados entre cuatro y siete minutos, el guion lo da por fallido y guarda los registros |
+| `[entrenar] ERROR` o `[evaluar] ERROR` | Casi siempre es consecuencia de un `[preparar] ERROR` anterior: arréglalo primero. Si `preparar` terminó bien, ejecuta `./fraude evidencia` y envía el `.zip`: `modelo.json` y `metricas.json` dicen qué pasó |
 | Cualquier otro `ERROR` | Ejecuta `./fraude evidencia` y envía el `.zip`. Con eso basta para diagnosticarlo |
 
 Ejecutar `./fraude todo` varias veces no rompe nada. Para volver a empezar de cero: `./fraude apagar` y de nuevo `./fraude todo`.
