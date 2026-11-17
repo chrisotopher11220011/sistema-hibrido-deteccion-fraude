@@ -398,6 +398,169 @@ def _exportar_casos(raiz: Path, carpeta: Path) -> list[str]:
     ]
 
 
+ALERTAS = ("alerta_prioritaria", "revision_recomendada")
+NOTA_SIMULACION = (
+    "Lo enviado desde la pagina y lo que respondio el sistema. La comparacion con la etiqueta "
+    "real se hace aqui, al reunir la evidencia: la etiqueta nunca viajo al flujo. Cubre solo "
+    "las transacciones que se enviaron en la sesion; ilustra, no sustituye a comparativa.md."
+)
+
+
+def _enmascarar_valores(valor):
+    if isinstance(valor, str):
+        return enmascarar(valor)
+    if isinstance(valor, dict):
+        return {k: _enmascarar_valores(v) for k, v in valor.items()}
+    if isinstance(valor, list):
+        return [_enmascarar_valores(v) for v in valor]
+    return valor
+
+
+def _etiquetas_del_lote(raiz: Path) -> dict[str, dict[str, int | None]]:
+    """Por lote (`real`, `muestra`): `id_transaccion` -> etiqueta real."""
+    etiquetas: dict[str, dict[str, int | None]] = {}
+    for fuente, parte in (("muestra", "muestra"), ("real", "")):
+        mapa: dict[str, int | None] = {}
+        datos = _leer(Path(raiz) / "datos" / parte / "demostracion" / "lote.json")
+        for elemento in (datos or {}).get("elementos", []):
+            transaccion = elemento.get("transaccion")
+            if isinstance(transaccion, dict) and isinstance(transaccion.get("id_transaccion"), str):
+                mapa[transaccion["id_transaccion"]] = elemento.get("etiqueta_real")
+        etiquetas[fuente] = mapa
+    return etiquetas
+
+
+def _nivel_de(intercambio: dict) -> str | None:
+    respuesta = intercambio.get("respuesta")
+    if not isinstance(respuesta, dict):
+        return None
+    caso = respuesta.get("caso") if isinstance(respuesta.get("caso"), dict) else respuesta
+    nivel = caso.get("nivel")
+    return nivel if isinstance(nivel, str) else None
+
+
+def _matriz() -> dict:
+    return {"vp": 0, "fp": 0, "fn": 0, "vn": 0}
+
+
+def _resumir_sesion(nombre: str | None, intercambios: list[dict]) -> dict:
+    enviadas = [i for i in intercambios if i.get("ruta") == "transacciones"]
+    # Solo cuentan las que el flujo evaluo: un intento sin respuesta se reintenta despues.
+    transacciones = [i for i in enviadas if _nivel_de(i)]
+    comparacion = {
+        "cualquier_alerta": _matriz(),
+        "solo_prioritaria": _matriz(),
+        "sin_etiqueta": 0,
+        "sin_veredicto": 0,
+    }
+    niveles: dict[str, int] = {}
+    for i in transacciones:
+        nivel = _nivel_de(i)
+        niveles[nivel] = niveles.get(nivel, 0) + 1
+        etiqueta = i.get("etiqueta_real")
+        if etiqueta not in (0, 1):
+            comparacion["sin_etiqueta"] += 1
+            continue
+        if nivel not in ALERTAS and nivel != "sin_alerta":
+            comparacion["sin_veredicto"] += 1
+            continue
+        for clave, positivos in (
+            ("cualquier_alerta", ALERTAS),
+            ("solo_prioritaria", ("alerta_prioritaria",)),
+        ):
+            senalada = nivel in positivos
+            celda = ("vp" if senalada else "fn") if etiqueta == 1 else ("fp" if senalada else "vn")
+            comparacion[clave][celda] += 1
+    latencias = [i["latencia_ms"] for i in transacciones if i.get("latencia_ms") is not None]
+    codigos: dict[str, int] = {}
+    for i in intercambios:
+        codigos[str(i.get("codigo"))] = codigos.get(str(i.get("codigo")), 0) + 1
+    fechas = [i.get("fecha") for i in intercambios if i.get("fecha")]
+    return {
+        "sesion": nombre,
+        "inicio": min(fechas) if fechas else None,
+        "fin": max(fechas) if fechas else None,
+        "transacciones": len(transacciones),
+        "sin_respuesta_del_flujo": len(enviadas) - len(transacciones),
+        "revisiones": sum(1 for i in intercambios if i.get("ruta") == "revisiones"),
+        "niveles": niveles,
+        "codigos": codigos,
+        "latencia_ms": _latencias(latencias),
+        "comparacion": comparacion,
+    }
+
+
+def _latencias(valores: list[float]) -> dict:
+    if not valores:
+        return {"n": 0, "mediana": None, "p95": None}
+    ordenados = sorted(valores)
+
+    def percentil(q: float) -> float:
+        posicion = (len(ordenados) - 1) * q
+        bajo = int(posicion)
+        alto = min(bajo + 1, len(ordenados) - 1)
+        return round(ordenados[bajo] + (ordenados[alto] - ordenados[bajo]) * (posicion - bajo), 1)
+
+    return {
+        "n": len(valores),
+        "mediana": percentil(0.5),
+        "p95": percentil(0.95),
+        "medida": "desde la API hasta la respuesta de n8n (incluye el flujo); la pagina suma "
+        "el salto del navegador a la API",
+    }
+
+
+def _exportar_simulacion(raiz: Path, en_curso: Path, carpeta: Path) -> list[str]:
+    """`simulacion.json` desde el registro de la pagina (seccion 13; ADR 0015)."""
+    origen = en_curso / "simulacion.jsonl"
+    intercambios, ilegibles = [], 0
+    if origen.is_file():
+        for linea in origen.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not linea.strip():
+                continue
+            try:
+                entrada = json.loads(linea)
+            except ValueError:
+                ilegibles += 1
+                continue
+            if isinstance(entrada, dict):
+                intercambios.append(_enmascarar_valores(entrada))
+            else:
+                ilegibles += 1
+    etiquetas = _etiquetas_del_lote(raiz)
+    for i in intercambios:
+        enviado = i.get("enviado")
+        id_t = enviado.get("id_transaccion") if isinstance(enviado, dict) else None
+        if i.get("ruta") == "transacciones":
+            fuentes = [i["lote"]] if i.get("lote") in etiquetas else ["muestra", "real"]
+            i["etiqueta_real"] = None
+            for fuente in fuentes:
+                if isinstance(id_t, str) and id_t in etiquetas[fuente]:
+                    i["etiqueta_real"] = etiquetas[fuente][id_t]
+    grupos: dict[str | None, list[dict]] = {}
+    for i in intercambios:
+        grupos.setdefault(i.get("sesion"), []).append(i)
+    sesiones = [_resumir_sesion(nombre, grupo) for nombre, grupo in grupos.items()]
+    contenido = {
+        "estado": "ok" if intercambios else "sin_sesiones",
+        "reportable": False,
+        "nota": NOTA_SIMULACION,
+        "intercambios_total": len(intercambios),
+        "lineas_ilegibles": ilegibles,
+        "sesiones": sesiones,
+        "intercambios": intercambios,
+    }
+    _escribir_json(carpeta / "simulacion.json", contenido)
+    if not intercambios:
+        return ["Sin sesiones de la pagina de simulacion: simulacion.json va vacio."]
+    enviadas = sum(s["transacciones"] for s in sesiones)
+    revisiones = sum(s["revisiones"] for s in sesiones)
+    return [
+        f"Pagina de simulacion: {len(sesiones)} sesion(es), {enviadas} transacciones enviadas "
+        f"y {revisiones} revision(es) (simulacion.json)."
+    ]
+
+
 def _resumen(
     momento: datetime,
     commit: str,
@@ -440,8 +603,9 @@ def _resumen(
         "de la seccion 15. n8n evalua cada transaccion del lote de demostracion con la API,",
         "clasifica el nivel, registra el caso y recibe la revision humana; demostrar mide la",
         "paridad con la tabla en Python y la latencia (flujo.json). La pagina de simulacion",
-        "llega en la fase 6. Solo las cifras calculadas con el conjunto real en el computador",
-        "de ejecucion (N3) son resultados; las de la muestra para pruebas no lo son.",
+        "envia el lote por n8n a traves de la API y su sesion queda en simulacion.json.",
+        "Solo las cifras calculadas con el conjunto real en el computador de ejecucion (N3)",
+        "son resultados; las de la muestra para pruebas no lo son.",
         "",
     ]
     return "\n".join(lineas)
@@ -484,6 +648,7 @@ def reunir_evidencia(
     notas += _copiar_modelo_y_evaluacion(en_curso, carpeta)
     notas += _copiar_flujo(en_curso, carpeta)
     notas += _exportar_casos(Path(raiz), carpeta)
+    notas += _exportar_simulacion(Path(raiz), en_curso, carpeta)
     notas.append(f"Capturas de pantalla copiadas: {capturas}.")
 
     observaciones = en_curso / "OBSERVACIONES.md"

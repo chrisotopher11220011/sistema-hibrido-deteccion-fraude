@@ -8,6 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH=/opt/venv/bin:$PATH \
     HOME=/tmp \
     FRAUDE_RAIZ=/trabajo \
+    FRAUDE_WEB=/app/web \
     PYTHON_IMAGEN=python:3.12.12-slim-bookworm
 
 RUN pip install --no-cache-dir uv==0.11.32
@@ -16,6 +17,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
+# Pagina de simulacion: HTML, CSS y JavaScript sin compilacion (docs/spec.md, seccion 13).
+COPY web ./web
 
 WORKDIR /trabajo
 EXPOSE 8000

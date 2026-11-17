@@ -2,7 +2,7 @@
 
 Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por cierto sin haberlo visto en el computador de ejecución y cómo se comprobará. Estados: **pendiente**, **confirmado** o **refutado**. Solo la evidencia de una ejecución N3 confirma o refuta, salvo S10, que es un supuesto sobre N2.
 
-- **Última actualización:** 2026-11-17 (UTC), al cerrar la fase 3.
+- **Última actualización:** 2026-11-17 (UTC), al cerrar la fase 6.
 - **Evidencia N3 recibida hasta hoy:** ninguna.
 
 | N.º | Supuesto | Cómo se comprueba | Estado | Notas |
@@ -14,7 +14,7 @@ Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por 
 | S5 | El entrenamiento termina en minutos | `modelo.json` (`tiempo_entrenamiento_s`) y `metricas.json` (`duracion_s`) | Pendiente | Ensayo N1 con un conjunto inventado del tamaño real (284.807 filas, 2 núcleos): `entrenar` cerca de 1 s y `evaluar` (mil remuestreos, diez semillas y partición temporal) unos 30 s, con menos de 1 GB de memoria. Son tiempos, no métricas: N3 lo confirma |
 | S6 | El flujo responde cada transacción en pocos segundos | `flujo.json` | Pendiente | Fase 5 |
 | S7 | Con `sudo`, los archivos de `resultados/` y `datos/` quedan a nombre del usuario | Punto de prueba A | Pendiente | En N2 se comprobó sin `sudo` y con `sudo ./fraude`. El caso de Omarchy (usuario normal y `sudo` solo para Docker) está probado en N1 con Docker simulado |
-| S8 | La página funciona en el Chrome de Omarchy | `simulacion.json` y `capturas/` | Pendiente | Fase 6 |
+| S8 | La página funciona en el Chrome de Omarchy | `simulacion.json` y `capturas/` | Pendiente | Desde la fase 6. **Comprobado en N2** con Chromium (Playwright) en 640, 1280 y 1920 px, dos temas y modo presentación, y en N1 con Google Chrome. Falta el Chrome de Omarchy 4 (punto C) |
 | S9 | Tras instalar el paquete de NVIDIA para contenedores, Docker usa la gráfica; si no, se usa el procesador | `anfitrion.json` y `explicaciones.json` | Pendiente | Fase 7. `anfitrion.json` ya anota si Docker tiene el runtime de NVIDIA |
 | S10 | GitHub Actions puede levantar n8n con Compose y probar el flujo | N2 desde la fase 1 | **Confirmado** | Es un supuesto sobre N2 y N2 lo demostró: CI en verde con el ping a n8n |
 | S11 | El cortafuegos de Omarchy no impide llegar a los puertos publicados en `127.0.0.1` ni la comunicación entre contenedores | Punto de prueba A: `errores.json` | Pendiente | `tareas` llama a `api` y a `n8n` por la red de Compose, y `./fraude estado` por `127.0.0.1` |
@@ -60,3 +60,12 @@ Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por 
 | S24 | n8n 2.47.7 ejecuta las expresiones y los nodos de los flujos como el simulador de N1 (Switch con la primera regla, salida de error, reintentos, expresiones con funciones flecha) | N2: `demostrar` con paridad total y `comprobar_flujos.py` en sus ramas de error | **Comprobado en N2** ([ejecución](https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/actions/runs/44131224953)): paridad 124/124 en las tres ejecuciones de `todo`, y las ramas sin modelo, entrada inválida, revisión y API detenida respondieron lo esperado. En N3 se repite con el lote real |
 | S25 | Con la API detenida, n8n agota los reintentos y responde en menos de un minuto, sin dejar al cliente colgado | N2: `comprobar_flujos.py --api-detenida` | **Comprobado en N2**: 502 con el caso en unos 22 s (el nombre `api` deja de resolverse). En Omarchy 4 puede variar con su DNS |
 | S26 | El lote de la muestra recorre los niveles que importan para la paridad (sin alerta, revisión, prioritaria y error) | N2: `flujo.json` (`niveles_n8n`) | **Comprobado en N2**. Con el lote real (N3) los niveles dependerán del modelo; la paridad exhaustiva sobre todas las combinaciones está en N1 |
+
+
+## Supuestos nuevos de la fase 6
+
+| N.º | Supuesto | Cómo se comprueba | Estado |
+|---|---|---|---|
+| S25 | Con el lote real, la página recorre las unas 126 transacciones a «1 por segundo» sin quedarse atrás: cada respuesta de n8n, pasando por la API, llega en menos de un segundo | N3: `simulacion.json` (`latencia_ms` por sesión) | Pendiente. En N2, con la muestra, el lote completo pasó seis veces a la velocidad máxima sin errores |
+| S26 | La página sigue fluida con miles de transacciones en el equipo de ejecución | N1 y N2: `comprobar_pagina.py` mide el repintado con 5.000 transacciones (menos de 100 ms); N3: `OBSERVACIONES.md` | Comprobado en N1 (unos 45 ms con Chrome) y en N2 (46 ms, [ejecución](https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/actions/runs/44144074191)). Falta la impresión de quien ejecuta |
+| S27 | Una persona sin formación técnica entiende qué hace el sistema y que solo señala para revisión | N3: `OBSERVACIONES.md` y cuestionario SUS | Pendiente. La revisión frente a las pautas de Amershi et al. está en `docs/interfaz-evaluacion.md` |

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:lote",
+  "title": "Lote de demostración",
+  "description": "Respuesta de GET /simulacion/lote (sección 8.6; ADR 0014 y 0015). La etiqueta real va en cada elemento, aparte de la transacción: la página la muestra después del veredicto y envía solo `transaccion`.",
+  "type": "object",
+  "required": ["version", "fuente", "reportable", "conteos", "elementos"],
+  "properties": {
+    "version": {"const": 1},
+    "fuente": {"enum": ["real", "muestra"]},
+    "reportable": {"type": "boolean"},
+    "conteos": {"type": "object"},
+    "elementos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["n", "tipo", "fila", "etiqueta_real", "descripcion", "transaccion"],
+        "properties": {
+          "n": {"type": "integer", "minimum": 1},
+          "tipo": {"enum": ["original", "sintetico", "invalida"]},
+          "fila": {"type": ["integer", "null"]},
+          "etiqueta_real": {"enum": [0, 1, null]},
+          "descripcion": {"type": ["string", "null"]},
+          "transaccion": {
+            "type": "object",
+            "not": {"anyOf": [{"required": ["etiqueta_real"]}]},
+            "description": "La transacción que se envía. Las inválidas no cumplen `transaccion` a propósito"
+          }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"tipo": {"const": "original"}}},
+            "then": {
+              "properties": {
+                "etiqueta_real": {"enum": [0, 1]},
+                "transaccion": {"$ref": "urn:fraude:contratos:transaccion"}
+              }
+            }
+          },
+          {
+            "if": {"properties": {"tipo": {"const": "sintetico"}}},
+            "then": {
+              "properties": {
+                "etiqueta_real": {"const": null},
+                "transaccion": {"$ref": "urn:fraude:contratos:transaccion"}
+              }
+            }
+          },
+          {
+            "if": {"properties": {"tipo": {"const": "invalida"}}},
+            "then": {"properties": {"etiqueta_real": {"const": null}}}
+          }
+        ]
+      }
+    }
+  }
+}

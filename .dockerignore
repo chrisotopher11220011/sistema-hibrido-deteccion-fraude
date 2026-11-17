@@ -3,4 +3,5 @@
 !uv.lock
 !README.md
 !src
+!web
 src/**/__pycache__

@@ -2,11 +2,11 @@
 
 Documento vivo. Cada chat lo lee al empezar y lo actualiza al cerrar.
 
-- **Última actualización:** 2026-11-17 (UTC), cierre de la fase 5
-- **Versión integrada en `main`:** 0.3.0. La 0.4.0 está en el Pull Request #7 y la 0.5.0 en el Pull Request #8, los dos **abiertos** con la CI en verde. El #8 se apoya en el #7 (apunta a la rama `fase-4-api-casos`). Orden: Christopher integra **primero el #7** en `main`; GitHub reapunta el #8 a `main` y entonces se integra el #8.
-- **Etiquetas `v0.1.0` a `v0.5.0`:** **pendientes**. El entorno de Claude no puede crear etiquetas; las crea Christopher desde GitHub (*Releases > Draft a new release*): `v0.1.0` sobre el commit `54c0be4`, `v0.2.0` sobre el commit `0a20cd8` `v0.3.0` sobre el commit `2ff2987` `v0.4.0` sobre el commit de integración del Pull Request #7 y `v0.5.0` sobre el del #8.
-- **Fase en curso:** ninguna. La fase 5 está terminada; sigue la fase 6 (página de simulación).
-- **Punto de prueba pendiente:** **B** (Omarchy 4): datos reales, entrenamiento y primeras métricas. Incluye lo que comprobaba el punto A.
+- **Última actualización:** 2026-11-17 (UTC), cierre de la fase 6
+- **Versión integrada en `main`:** 0.3.0. La 0.4.0 está en el Pull Request #7, la 0.5.0 en el #8 y la 0.6.0 en el #9, los tres **abiertos** con la CI en verde y apilados: el #8 apunta a `fase-4-api-casos` y el #9 a `fase-5-flujos-n8n`. Orden: Christopher integra **#7**, luego **#8** y luego **#9**; GitHub reapunta cada uno a `main` al integrar el anterior.
+- **Etiquetas `v0.1.0` a `v0.6.0`:** **pendientes**. El entorno de Claude no puede crear etiquetas; las crea Christopher desde GitHub (*Releases > Draft a new release*): `v0.1.0` sobre el commit `54c0be4`, `v0.2.0` sobre el commit `0a20cd8`, `v0.3.0` sobre el commit `2ff2987`, y `v0.4.0`, `v0.5.0` y `v0.6.0` sobre los commits de integración de los Pull Requests #7, #8 y #9.
+- **Fase en curso:** ninguna. La fase 6 está terminada; sigue la fase 7 (LLM local, opcional) o directamente el punto de prueba C.
+- **Punto de prueba pendiente:** **C** (Omarchy 4): sistema completo con la página. Incluye lo que comprobaban los puntos A y B.
 
 ## Fases
 
@@ -17,14 +17,15 @@ Documento vivo. Cada chat lo lee al empezar y lo actualiza al cerrar.
 | 3. Aprendizaje automático | v0.3.0 | Terminada (N1 y N2 con la muestra). Las métricas reales esperan el punto B (N3) | #5 |
 | 4. API y casos | v0.4.0 | Terminada (N1 y N2 con la muestra), pendiente de integrar. Sin punto de prueba propio | #7 (abierto) |
 | 5. Flujos de n8n | v0.5.0 | Terminada: paridad 124/124 en N2 con la muestra. Sin punto de prueba propio | #8 (abierto, sobre #7) |
-| 6. Página de simulación | v0.6.0 | Sin empezar | |
+| 6. Página de simulación | v0.6.0 | Terminada ([CI](https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/actions/runs/44144074191)): capturas revisadas en N2, axe-core sin violaciones y pruebas en verde con la muestra. Espera el punto C | #9 (abierto, sobre #8) |
 | 7. LLM local (opcional) | v0.7.0 | Sin empezar | |
 | 8. Mejora con evidencia | v0.8.x | Sin empezar | |
 | 9. Cierre | v1.0.0 | Sin empezar | |
 
 ## Qué existe hoy
 
-- `api` con `GET /salud` (estado del modelo), `POST /evaluar` (contrato 8.3), `POST /casos`, `GET /casos` y `POST /casos/{id}/revision` (SQLite en `datos/casos/casos.sqlite`). Carga el modelo de `datos/modelo/` o `datos/muestra/modelo/` (`FRAUDE_MODELO`) y lo recarga cuando `entrenar` deja uno nuevo (ADR 0013). Faltan las rutas `/`, `/simulacion/*` (fases 5 y 6).
+- `api` con `GET /salud` (estado del modelo), `POST /evaluar` (contrato 8.3), `POST /casos`, `GET /casos` y `POST /casos/{id}/revision` (SQLite en `datos/casos/casos.sqlite`). Carga el modelo de `datos/modelo/` o `datos/muestra/modelo/` (`FRAUDE_MODELO`) y lo recarga cuando `entrenar` deja uno nuevo (ADR 0013). Sirve la página en `/` y las rutas `/simulacion/*` (fase 6).
+- Página de simulación en `web/` (HTML, CSS y JavaScript sin compilación, sistema de diseño en `web/DISENO.md`): lote por n8n a través de la API, nivel y razones, etiqueta real después del veredicto, contadores y matriz del lote, gráficas en lienzo, bandeja de revisión, transacción manual, historial, temas, modo presentación y teclado. `src/fraude/simulacion.py`: rutas `/simulacion/*` y registro en `resultados/en_curso/simulacion.jsonl` (ADR 0015).
 - Contratos como esquemas JSON en `docs/contratos/`, con pruebas en `tests/contrato/`.
 - `n8n` 2.47.7 con tres flujos importados y publicados en cada arranque por `n8n/arranque.sh`: `ping` (`GET /webhook/ping`), `evaluacion` (`POST /webhook/transaccion`: validar, `/evaluar` con reintento, «Clasificar nivel», explicación por plantilla, notificación simulada, registrar caso y responder con él) y `revision` (`POST /webhook/revision`). ADR 0014.
 - Simulador de flujos para N1 (`tests/n8n/simulador.mjs`, Node.js) y paridad exhaustiva con `decision.clasificar`.
@@ -34,9 +35,9 @@ Documento vivo. Cada chat lo lee al empezar y lo actualiza al cerrar.
 - Contribución por variable con SHAP (`src/fraude/contribuciones.py`, ADR 0012) y tabla de decisión en Python (`src/fraude/decision.py`).
 - `preparar`: OpenML 1597 (ARFF con MD5 publicada) o CSV de Kaggle a mano en `datos/crudos/creditcard.csv`; conteos, huella SHA-256 del contenido, partición 56/14/30 en `datos/preparados/particion/`, `eda/` de la parte de ajuste, sintéticos en `datos/sinteticos/ubicacion.json` y `datos.json`. Funciona sin `Time`.
 - Motor de reglas (`src/fraude/reglas.py`) con la forma del contrato 8.3 y forma de la transacción del 8.2 (`src/fraude/transaccion.py`, con tipos estrictos).
-- Evidencia: los archivos «para diagnosticar» de la sección 16, más `datos.json`, `eda/`, `modelo.json`, `metricas.json`, `comparativa.md`, `figuras/`, `analisis_errores/`, `casos.csv`, `revisiones.csv`, `flujo.json`, `OBSERVACIONES.md` y `capturas/`.
+- Evidencia: los archivos «para diagnosticar» de la sección 16, más `datos.json`, `eda/`, `modelo.json`, `metricas.json`, `comparativa.md`, `figuras/`, `analisis_errores/`, `casos.csv`, `revisiones.csv`, `flujo.json`, `simulacion.json`, `OBSERVACIONES.md` y `capturas/`.
 - Guion `./fraude` con `todo [--muestra]`, `evidencia`, `abrir`, `estado`, `apagar` y los pasos sueltos.
-- CI: estilo, pruebas unitarias y de contrato, `shellcheck` y punta a punta con Compose usando `todo --muestra`, más la API en marcha (`tests/punta_a_punta/comprobar_api.py`), la exportación de casos, los flujos de n8n reales sin modelo, con revisión y con la API detenida (`comprobar_flujos.py`), y la paridad total de `demostrar` en `flujo.json`.
+- CI: estilo, pruebas unitarias y de contrato, `shellcheck` y punta a punta con Compose usando `todo --muestra`, más la API en marcha (`tests/punta_a_punta/comprobar_api.py`), la exportación de casos, los flujos de n8n reales sin modelo, con revisión y con la API detenida (`comprobar_flujos.py`), y la paridad total de `demostrar` en `flujo.json`. Desde la fase 6, la página en Chromium con Playwright (`comprobar_pagina.py`): teclado, etiqueta, estados de error, axe-core, fluidez y capturas (artefacto `capturas-pagina` y hoja de contactos en el registro).
 
 ## Decisiones tomadas al construir (fase 1)
 
@@ -99,7 +100,20 @@ Las que la especificación dejaba «para quien construya»:
 | Lote de demostración | Parte de prueba (20 fraudes como máximo y 80 no fraudes), 20 sintéticas y 6 inválidas, con semilla | `config/modelo.yaml`, `src/fraude/lote.py` |
 | Latencia | Transacciones válidas, desde `tareas` hasta la respuesta del webhook; mediana y p95 con interpolación lineal. `demostrar` falla si una válida termina en `error_evaluacion` (paridad sin cobertura) | `src/fraude/demostrar.py` |
 
-## Límites del entorno de Claude (comprobados el 2026-11-17, fase 5)
+## Decisiones tomadas al construir (fase 6)
+
+| Tema | Decisión | Dónde |
+|---|---|---|
+| Dirección visual | Mesa de verificación: papel de seguridad, tinta de billete, sello violeta; boleta perforada con sello del nivel | `web/DISENO.md`, `docs/planes/fase-6.md` |
+| Tipografía | Atkinson Hyperlegible Next (OFL), incluida en `web/fuentes/` | `web/DISENO.md` |
+| Lote que sirve la página | El de la fuente del modelo cargado; sin modelo, según `FRAUDE_MODELO` | ADR 0015 |
+| Etiqueta real | La página solo envía `transaccion`; la API rechaza `etiqueta_real` (422) | ADR 0015 |
+| Registro de la sesión | `simulacion.jsonl` por la API; `simulacion.json` con la comparación al reunir la evidencia | ADR 0015, `src/fraude/evidencia.py` |
+| Herramienta de capturas | Playwright con Chromium en la CI; axe-core 4.14.1 para WCAG | ADR 0015, `.github/workflows/ci.yml` |
+| Página en N1 sin Docker | n8n de pruebas con los flujos reales y el simulador | `tests/punta_a_punta/n8n_de_pruebas.py` |
+| Reenvío a n8n | En un hilo aparte: evita el interbloqueo con las llamadas de n8n a la API | ADR 0015 |
+
+## Límites del entorno de Claude (comprobados el 2026-11-17, fase 6)
 
 - Llega a GitHub (repositorio y API REST; no GraphQL) y a PyPI.
 - Puede subir ramas y abrir Pull Requests (con la API REST: `gh pr create` usa GraphQL y falla). En las fases 4 y 5 no integró: el #8 depende del #7, que integra Christopher. No puede crear etiquetas ni publicaciones.
@@ -107,6 +121,9 @@ Las que la especificación dejaba «para quien construya»:
 - Tiene el cliente de Docker pero no el servicio en marcha: Compose y n8n solo se prueban en N2. n8n 2.47.7 pide Node.js 24 y aquí hay 22; instalar otro Node fue denegado. El simulador de flujos sí corre con Node 22.
 - Llega al código de n8n en GitHub (etiqueta `n8n@2.47.7`), que sirve para verificar el formato de los nodos.
 - La consola trabaja como `root`: las pruebas del guion deben ejecutarse también con un usuario normal (ver `CLAUDE.md`).
+- Hay Google Chrome y Playwright para Python 1.63 en el sistema, y npm llega al registro: la página se prueba en N1 con `n8n_de_pruebas.py`, `uvicorn` y `comprobar_pagina.py --chrome /usr/bin/google-chrome` (axe-core con `npm pack axe-core@4.14.1`).
+- Lee los registros de GitHub Actions, pero **no** descarga artefactos (el almacenamiento de artefactos no está permitido): por eso la CI imprime una hoja de contactos de las capturas en base64 (`hoja_capturas.py`).
+- No tiene `shellcheck`: lo comprueba la CI.
 
 Cada chat lo vuelve a comprobar al empezar.
 
@@ -116,13 +133,11 @@ Cada chat lo vuelve a comprobar al empezar.
 - Si quiere Telegram.
 - Si quiere una ejecución completa bajo demanda en GitHub Actions con datos reales.
 
-## Notas para el siguiente chat (fase 6)
+## Notas para el siguiente chat (fase 7 o mejora tras el punto C)
 
-- Antes de empezar: comprobar si Christopher integró los Pull Requests #7 y #8. Si no, crear la rama de la fase 6 desde `fase-5-flujos-n8n` y apuntar su Pull Request a esa rama.
-- La página habla solo con la API (ADR 0007). `POST /simulacion/transacciones` reenvía a `http://n8n:5678/webhook/transaccion` y devuelve el caso: 200 con el caso registrado (esquema `caso`) o 502 con `error_flujo` (el caso calculado viene en `caso`). `POST /simulacion/revisiones` reenvía a `/webhook/revision` con `{id_caso, decision, revisor, comentario}` y repite su código (200, 404, 409, 422 o 502).
-- `GET /simulacion/lote` sirve `lote.ruta(raiz, muestra)` (`src/fraude/lote.py`): cada elemento trae `tipo` (`original`, `sintetico`, `invalida`), `etiqueta_real` (0, 1 o `null`), `descripcion` y `transaccion`. La etiqueta es solo para mostrarla después del veredicto: nunca se envía. Qué lote usar (real o muestra) debe seguir la misma lógica que `FRAUDE_MODELO`.
-- La explicación del caso (`explicacion.texto`) ya dice «señala para revisión»; las razones están en `razones` y las señales completas en `senales`.
-- `simulacion.json` (sección 13) es aparte de `flujo.json`: la latencia de la página incluye el salto por la API (ADR 0007).
-- Las ramas de error que la página debe mostrar: `error_evaluacion` (entrada inválida, sin modelo) y 502 (API o n8n caídos).
-- Pendiente de la fase 3 que sigue en pie: si llega evidencia del punto B, revisar `datos.json`, `modelo.json` y `metricas.json` y actualizar S3, S5, S12, S15–S17, S19 y S20; con el lote real, revisar también `flujo.json` (S23, S24). Las cifras de `comparativa.md` serán las primeras reportables: citarlas con su carpeta de evidencia.
+- Antes de empezar: comprobar si Christopher integró los Pull Requests #7, #8 y #9. Si no, crear la rama siguiente desde `fase-6-pagina-simulacion` y apuntar su Pull Request a esa rama.
+- La explicación del caso llega en `explicacion` (`texto`, `origen`, `modelo`, `duracion_ms`). La página ya muestra «explicación por modelo de lenguaje» cuando `origen` es `llm`: la fase 7 no necesita tocar la página para eso.
+- Para ver la página en N1: preparar y entrenar con la muestra en una raíz temporal (`FRAUDE_RAIZ`), generar el lote (`lote.generar`), arrancar `uvicorn fraude.api:app` con `FRAUDE_URL_N8N` apuntando a `n8n_de_pruebas.py`, y ejecutar `comprobar_pagina.py`.
+- Para mirar las capturas de N2: el registro del paso «Hoja de contactos de las capturas» trae tres JPEG en base64 entre `=== HOJA <nombre> INICIO ===` y `FIN`.
+- Si llega evidencia del punto C: `simulacion.json` (sesiones, latencias, comparación), `revisiones.csv`, `capturas/` y el SUS de `OBSERVACIONES.md`. Actualizar S8, S25 a S27 y la tabla SUS de `docs/interfaz-evaluacion.md`. Lo de los puntos A y B sigue en pie: `datos.json`, `modelo.json`, `metricas.json` y `flujo.json` (S3, S5, S12, S15–S17, S19, S20, S23, S24). Las cifras de `comparativa.md` serán las primeras reportables: citarlas siempre con su carpeta de evidencia.
 - `MONTO_ALTO` puede detectar pocos fraudes: si pasa, se reporta tal cual (sección 10).

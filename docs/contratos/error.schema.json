@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:fraude:contratos:error",
   "title": "Respuesta de error de la API",
-  "description": "ADR 0013. Toda respuesta que no es 2xx lleva este cuerpo. En POST /evaluar, cualquier respuesta no 200 hace que n8n marque el caso como error_evaluacion (sección 12). `ruta_no_disponible` lleva el código original (404 o 405).",
+  "description": "ADR 0013. Toda respuesta que no es 2xx lleva este cuerpo. En POST /evaluar, cualquier respuesta no 200 hace que n8n marque el caso como error_evaluacion (sección 12). `ruta_no_disponible` lleva el código original (404 o 405). Los tres últimos tipos son de las rutas /simulacion/* (ADR 0015).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -33,7 +33,10 @@
             "error_interno",
             "caso_no_encontrado",
             "caso_ya_revisado",
-            "ruta_no_disponible"
+            "ruta_no_disponible",
+            "lote_no_disponible",
+            "etiqueta_en_transaccion",
+            "n8n_no_disponible"
           ]
         },
         "mensaje": {

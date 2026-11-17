@@ -6,12 +6,14 @@ name: fraude
 services:
   api:
     build: .
-    image: fraude-local:0.5.0
+    image: fraude-local:0.6.0
     user: "${FRAUDE_UID:-1000}:${FRAUDE_GID:-1000}"
     environment:
       # Que modelo usa la API: auto (el real si existe; si no, el de la muestra), real o
       # muestra. Lo recarga sola cuando `entrenar` deja uno nuevo (ADR 0013).
       FRAUDE_MODELO: "${FRAUDE_MODELO:-auto}"
+      # La pagina habla con n8n a traves de la API, por la red interna (ADR 0007 y 0015).
+      FRAUDE_URL_N8N: http://n8n:5678
     ports:
       - "127.0.0.1:${FRAUDE_PUERTO_API:-8000}:8000"
     volumes:
@@ -65,7 +67,7 @@ services:
       start_period: 180s
 
   tareas:
-    image: fraude-local:0.5.0
+    image: fraude-local:0.6.0
     pull_policy: never
     profiles: ["tareas"]
     user: "${FRAUDE_UID:-1000}:${FRAUDE_GID:-1000}"
