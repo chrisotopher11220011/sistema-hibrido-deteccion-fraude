@@ -1,8 +1,12 @@
 """Comprueba, en la CI, la carpeta de evidencia mas reciente (N2).
 
-Uso: python tests/punta_a_punta/comprobar_evidencia.py [--con-anfitrion]
+Uso: python tests/punta_a_punta/comprobar_evidencia.py [--con-anfitrion] [--con-casos]
+
+`--con-casos` exige al menos un caso y una revision en casos.csv y revisiones.csv (los deja
+tests/punta_a_punta/comprobar_api.py).
 """
 
+import csv
 import json
 import os
 import sys
@@ -27,6 +31,8 @@ ARCHIVOS = (
     "analisis_errores/resumen.json",
     "analisis_errores/fraudes_no_detectados.csv",
     "analisis_errores/falsas_alarmas.csv",
+    "casos.csv",
+    "revisiones.csv",
 )
 FIGURAS = {
     "comparativa_prueba.png",
@@ -38,6 +44,7 @@ FIGURAS = {
 
 def main() -> int:
     con_anfitrion = "--con-anfitrion" in sys.argv
+    con_casos = "--con-casos" in sys.argv
     carpetas = sorted(p for p in RESULTADOS.iterdir() if p.is_dir() and p.name != "en_curso")
     if not carpetas:
         print("No hay ninguna carpeta de evidencia")
@@ -95,6 +102,11 @@ def main() -> int:
             fallos.append("falta datos/sinteticos/ubicacion.json")
         elif {t["origen"] for t in json.loads(sinteticos.read_text())} != {"sintetico"}:
             fallos.append("los datos sinteticos traen transacciones que no son sinteticas")
+        if con_casos:
+            for nombre in ("casos.csv", "revisiones.csv"):
+                with (carpeta / nombre).open(encoding="utf-8", newline="") as archivo:
+                    if not list(csv.DictReader(archivo)):
+                        fallos.append(f"{nombre} no trae ninguna fila")
         if con_anfitrion:
             anfitrion = json.loads((carpeta / "anfitrion.json").read_text())
             if "uso_sudo" not in anfitrion:

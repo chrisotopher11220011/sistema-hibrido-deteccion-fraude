@@ -6,7 +6,7 @@ No bloquea operaciones reales ni está pensado para producción. El sistema señ
 
 ## Estado
 
-**Versión 0.3.0 — Fase 3, aprendizaje automático.** Además de los cimientos (fase 1) y de los datos y las reglas (fase 2), existen el entrenamiento de Isolation Forest, la elección de umbrales en validación, la contribución por variable con SHAP y la evaluación con el protocolo de la sección 15 (cuatro configuraciones, tres líneas base, intervalos de confianza, diez semillas y partición temporal). Todavía **no hay** página de simulación ni flujo de evaluación en n8n. Las cifras de desempeño solo existirán cuando se ejecute con los datos reales en el computador de ejecución (N3): lo calculado en la CI usa la muestra para pruebas y no es un resultado.
+**Versión 0.4.0 — Fase 4, API y casos.** Además de los cimientos (fase 1), los datos y las reglas (fase 2) y el aprendizaje automático (fase 3), la API evalúa transacciones con `POST /evaluar` (reglas e Isolation Forest, con las variables que más pesaron en cada anomalía), carga sola el modelo que deja `entrenar` y registra casos y revisiones humanas en SQLite. Los contratos de la sección 8 están como esquemas en [`docs/contratos/`](docs/contratos/README.md). Todavía **no hay** flujo de evaluación en n8n ni página de simulación. Las cifras de desempeño solo existirán cuando se ejecute con los datos reales en el computador de ejecución (N3): lo calculado en la CI usa la muestra para pruebas y no es un resultado.
 
 El avance detallado está en [`docs/ESTADO.md`](docs/ESTADO.md) y los cambios en [`CHANGELOG.md`](CHANGELOG.md).
 

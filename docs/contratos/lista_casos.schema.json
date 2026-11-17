@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:lista_casos",
+  "title": "Respuesta de GET /casos",
+  "description": "Casos del más reciente al más antiguo. `total` cuenta los que cumplen el filtro, aunque `limite` devuelva menos.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "total",
+    "casos"
+  ],
+  "properties": {
+    "total": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "casos": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:fraude:contratos:caso"
+      }
+    }
+  }
+}

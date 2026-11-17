@@ -20,7 +20,7 @@ Página de simulación (navegador)
                                              +-------------------------------------+
 ```
 
-## Hoy (versión 0.3.0)
+## Hoy (versión 0.4.0)
 
 ```
 Computador de ejecución (Omarchy 4)
@@ -30,7 +30,9 @@ Computador de ejecución (Omarchy 4)
 │     └─ llama a Compose
 │
 └─ Docker Compose (proyecto «fraude»)
-      ├─ api ............ FastAPI · 127.0.0.1:8000 · GET /salud
+      ├─ api ............ FastAPI · 127.0.0.1:8000 · GET /salud, POST /evaluar,
+      │                   POST /casos, GET /casos, POST /casos/{id}/revision
+      │                   carga y recarga el modelo de datos/modelo/; casos en SQLite
       ├─ n8n ............ n8n 2.47.7 · 127.0.0.1:5678 · GET /webhook/ping
       │                   arranque.sh: importar flujos → publicar → n8n start
       └─ tareas ......... línea de comandos (perfil «tareas», sin puerto)
@@ -60,6 +62,7 @@ generador sintético ──> datos/sinteticos/ubicacion.json ──> comprobaci�
 | `datos/muestra/` | Muestra para pruebas (N1 y N2), con la misma estructura |
 | `datos/sinteticos/` | Transacciones sintéticas de ubicación |
 | `datos/modelo/`, `datos/muestra/modelo/` | Artefacto del modelo (`modelo.joblib`) y su `modelo.json` |
+| `datos/casos/` | Registro de casos de la API (`casos.sqlite`) |
 
 | Módulo de `src/fraude/` | Responsabilidad |
 |---|---|
@@ -76,6 +79,30 @@ generador sintético ──> datos/sinteticos/ubicacion.json ──> comprobaci�
 | `metricas.py` | Métricas con pesos, *bootstrap* estratificado e intervalos |
 | `entrenar.py` | Orquesta el entrenamiento y escribe `modelo.json` |
 | `evaluar.py`, `comparativa.py`, `figuras.py`, `graficas.py` | Protocolo de la sección 15, `metricas.json`, `comparativa.md`, figuras y análisis de errores |
+| `api.py` | Rutas de la API (sección 8.6) y manejo de errores (ADR 0013) |
+| `servicio_modelo.py` | Carga, recarga y uso del modelo en la API (ADR 0013) |
+| `evaluacion.py` | Transacción → respuesta de `/evaluar` (sección 8.3) |
+| `errores.py` | Cuerpo de error común a todas las rutas |
+| `casos.py`, `registro.py` | Forma de los casos y su registro en SQLite (sección 8.5, ADR 0005) |
+
+### API y casos (fase 4)
+
+```
+transacción ──> POST /evaluar ──> validación (contrato 8.2) ──── inválida ──> 422 entrada_invalida
+                                     │
+                                     ├─ reglas (config/reglas.yaml)
+                                     └─ ¿trae variables? ── no ──> modelo «no evaluable»
+                                              │ sí
+                                              ├─ sin modelo cargado ──> 503 modelo_no_disponible
+                                              └─ Isolation Forest + umbrales de modelo.json
+                                                  └─ si hay anomalía: contribuciones SHAP
+                                     ──> 200 con el contrato 8.3
+
+n8n (fase 5) ──> POST /casos ──> datos/casos/casos.sqlite ──> casos.csv y revisiones.csv
+página (fase 6) ──> POST /casos/{id}/revision                  (en la evidencia)
+```
+
+Cualquier respuesta de `/evaluar` que no sea 200 hace que n8n marque el caso `error_evaluacion`. Los contratos están en `docs/contratos/`.
 
 | Pieza | Archivos |
 |---|---|

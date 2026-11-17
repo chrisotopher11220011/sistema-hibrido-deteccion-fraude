@@ -79,6 +79,16 @@ jobs:
       - name: Evidencia del camino directo
         run: python3 tests/punta_a_punta/comprobar_evidencia.py
 
+      # Fase 4: la API cargo sola el modelo que entreno `todo`, evalua con el contrato 8.3,
+      # responde errores con cuerpo y registra y revisa casos.
+      - name: API en marcha (modelo, /evaluar, errores y casos)
+        run: python3 tests/punta_a_punta/comprobar_api.py http://127.0.0.1:8000
+
+      - name: La evidencia exporta casos y revisiones
+        run: |
+          docker compose run --rm -T tareas evidencia
+          python3 tests/punta_a_punta/comprobar_evidencia.py --con-casos
+
       - name: Apagar
         run: docker compose down
 

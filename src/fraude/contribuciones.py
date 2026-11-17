@@ -20,26 +20,39 @@ METODO = (
 )
 
 
+class Explicador:
+    """Explicador SHAP de un bosque, creado una vez y reutilizado (la API lo guarda)."""
+
+    def __init__(self, bosque: IsolationForest):
+        self._explicador = shap.TreeExplainer(bosque)
+
+    def valores(self, X: np.ndarray) -> tuple[np.ndarray, float]:
+        valores = self._explicador.shap_values(np.asarray(X, dtype=np.float64))
+        base = float(np.ravel(self._explicador.expected_value)[0])
+        return np.asarray(valores, dtype=np.float64), base
+
+    def contribuciones(self, X: np.ndarray, variables: list[str], k: int) -> list[list[dict]]:
+        """Para cada fila, las `k` variables con mayor peso hacia la anomalia."""
+        X = np.asarray(X, dtype=np.float64)
+        if len(X) == 0:
+            return []
+        pesos = -self.valores(X)[0]
+        orden = np.argsort(-pesos, axis=1, kind="stable")[:, :k]
+        return [
+            [{"variable": variables[j], "peso": round(float(fila[j]), 6)} for j in indices]
+            for fila, indices in zip(pesos, orden, strict=True)
+        ]
+
+
 def _valores(bosque: IsolationForest, X: np.ndarray) -> tuple[np.ndarray, float]:
-    explicador = shap.TreeExplainer(bosque)
-    valores = explicador.shap_values(np.asarray(X, dtype=np.float64))
-    base = float(np.ravel(explicador.expected_value)[0])
-    return np.asarray(valores, dtype=np.float64), base
+    return Explicador(bosque).valores(X)
 
 
 def contribuciones(
     bosque: IsolationForest, X: np.ndarray, variables: list[str], k: int
 ) -> list[list[dict]]:
     """Para cada fila, las `k` variables con mayor peso hacia la anomalia."""
-    X = np.asarray(X, dtype=np.float64)
-    if len(X) == 0:
-        return []
-    pesos = -_valores(bosque, X)[0]
-    orden = np.argsort(-pesos, axis=1, kind="stable")[:, :k]
-    return [
-        [{"variable": variables[j], "peso": round(float(fila[j]), 6)} for j in indices]
-        for fila, indices in zip(pesos, orden, strict=True)
-    ]
+    return Explicador(bosque).contribuciones(X, variables, k)
 
 
 def error_aditividad(bosque: IsolationForest, X: np.ndarray) -> float:

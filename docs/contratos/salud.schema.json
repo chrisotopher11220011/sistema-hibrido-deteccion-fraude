@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:salud",
+  "title": "Respuesta de GET /salud",
+  "description": "Estado del servicio y del modelo (sección 8.6). `estado` es ok mientras la API responde, haya o no modelo.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "estado",
+    "servicio",
+    "version",
+    "fecha",
+    "modelo"
+  ],
+  "properties": {
+    "estado": {
+      "const": "ok"
+    },
+    "servicio": {
+      "const": "api"
+    },
+    "version": {
+      "type": "string"
+    },
+    "fecha": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
+    "modelo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cargado",
+        "fuente",
+        "version",
+        "reportable",
+        "umbral_revision",
+        "umbral_prioritaria",
+        "motivo"
+      ],
+      "properties": {
+        "cargado": {
+          "type": "boolean"
+        },
+        "fuente": {
+          "enum": [
+            "real",
+            "muestra",
+            null
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reportable": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "umbral_revision": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "umbral_prioritaria": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "motivo": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Por qué no hay modelo cargado"
+        }
+      },
+      "if": {
+        "properties": {
+          "cargado": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "fuente": {
+            "enum": [
+              "real",
+              "muestra"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "umbral_revision": {
+            "type": "number"
+          },
+          "umbral_prioritaria": {
+            "type": "number"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

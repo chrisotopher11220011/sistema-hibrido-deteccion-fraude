@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 from sklearn.metrics import fbeta_score
@@ -80,3 +82,25 @@ def test_guardar_y_cargar_da_las_mismas_puntuaciones(tmp_path):
 def test_sin_artefacto_dice_que_entrene(tmp_path):
     with pytest.raises(ErrorModelo, match="entrenar"):
         modelo.cargar_artefacto(tmp_path / "no")
+
+
+def test_cargar_artefacto_usa_los_mismos_bytes_que_comprueba(tmp_path, monkeypatch):
+    # Revision de codigo: la huella y la carga salen de una sola lectura; si `entrenar`
+    # reescribe el archivo entre las dos, no puede cargarse un bosque con otro modelo.json.
+    X = np.random.default_rng(0).normal(size=(50, 3))
+    bosque = modelo.entrenar_bosque(X, {"n_estimators": 5, "max_samples": 16}, 0)
+    modelo.guardar_artefacto(tmp_path, bosque, {"estado": "ok"})
+    argumentos = []
+    cargar_original = modelo.joblib.load
+
+    def espiar(origen, *args, **kwargs):
+        argumentos.append(origen)
+        return cargar_original(origen, *args, **kwargs)
+
+    monkeypatch.setattr(modelo.joblib, "load", espiar)
+
+    cargado, _ = modelo.cargar_artefacto(tmp_path)
+
+    assert len(argumentos) == 1
+    assert not isinstance(argumentos[0], (str, Path))
+    assert np.allclose(modelo.puntuar(cargado, X), modelo.puntuar(bosque, X))

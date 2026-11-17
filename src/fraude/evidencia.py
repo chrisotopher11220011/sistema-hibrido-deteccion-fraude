@@ -5,6 +5,7 @@ anfitrion (datos del sistema, registros de Docker y capturas) lo deja el guion
 `./fraude` en `resultados/en_curso/`; aqui se copia a la carpeta de evidencia.
 """
 
+import csv
 import json
 import os
 import platform
@@ -19,6 +20,7 @@ from importlib import metadata
 from pathlib import Path
 
 from fraude import __version__
+from fraude.registro import RegistroCasos, ruta_bd_casos
 
 DEPENDENCIAS = (
     "fastapi",
@@ -274,6 +276,110 @@ def _copiar_modelo_y_evaluacion(en_curso: Path, carpeta: Path) -> list[str]:
     return notas
 
 
+COLUMNAS_CASOS = (
+    "id_caso",
+    "fecha_procesamiento",
+    "id_transaccion",
+    "origen",
+    "monto",
+    "nivel",
+    "puntuacion",
+    "reglas_activadas",
+    "anomalia",
+    "razones",
+    "estado",
+    "decision_final",
+    "explicacion_origen",
+    "explicacion",
+    "notificacion_canal",
+    "notificacion_estado",
+    "version_reglas",
+    "version_modelo",
+    "version_flujo",
+)
+COLUMNAS_REVISIONES = (
+    "id_caso",
+    "id_transaccion",
+    "nivel",
+    "decision_final",
+    "revisor",
+    "comentario",
+    "fecha_revision",
+    "fecha_procesamiento",
+    "version_modelo",
+)
+
+
+def _fila_caso(caso: dict) -> dict:
+    senales = caso.get("senales") or {}
+    activadas = [r["id"] for r in senales.get("reglas", []) if r.get("activada")]
+    modelo = senales.get("modelo") or {}
+    versiones = caso.get("versiones") or {}
+    explicacion = caso.get("explicacion") or {}
+    notificacion = caso.get("notificacion") or {}
+    return {
+        "id_caso": caso["id_caso"],
+        "fecha_procesamiento": caso["fecha_procesamiento"],
+        "id_transaccion": caso.get("id_transaccion"),
+        "origen": caso.get("origen"),
+        "monto": caso.get("monto"),
+        "nivel": caso["nivel"],
+        "puntuacion": caso.get("puntuacion"),
+        "reglas_activadas": " | ".join(activadas),
+        "anomalia": modelo.get("anomalia") if modelo.get("evaluable") else "no_evaluable",
+        "razones": " | ".join(caso.get("razones") or []),
+        "estado": caso["estado"],
+        "decision_final": caso["decision_final"],
+        "explicacion_origen": explicacion.get("origen"),
+        "explicacion": enmascarar(explicacion.get("texto") or ""),
+        "notificacion_canal": notificacion.get("canal"),
+        "notificacion_estado": notificacion.get("estado"),
+        "version_reglas": versiones.get("reglas"),
+        "version_modelo": versiones.get("modelo"),
+        "version_flujo": versiones.get("flujo"),
+    }
+
+
+def _fila_revision(caso: dict) -> dict:
+    revision = caso["revision"]
+    return {
+        "id_caso": caso["id_caso"],
+        "id_transaccion": caso.get("id_transaccion"),
+        "nivel": caso["nivel"],
+        "decision_final": caso["decision_final"],
+        "revisor": enmascarar(revision["revisor"]),
+        "comentario": enmascarar(revision.get("comentario") or ""),
+        "fecha_revision": revision["fecha"],
+        "fecha_procesamiento": caso["fecha_procesamiento"],
+        "version_modelo": (caso.get("versiones") or {}).get("modelo"),
+    }
+
+
+def _escribir_csv(ruta: Path, columnas: tuple, filas: list[dict]) -> None:
+    with ruta.open("w", encoding="utf-8", newline="") as archivo:
+        escritor = csv.DictWriter(archivo, fieldnames=columnas)
+        escritor.writeheader()
+        escritor.writerows(filas)
+
+
+def _exportar_casos(raiz: Path, carpeta: Path) -> list[str]:
+    """`casos.csv` y `revisiones.csv` desde la base de la API (seccion 16; ADR 0005)."""
+    ruta = ruta_bd_casos(raiz)
+    casos = RegistroCasos(ruta).todos() if ruta.is_file() else []
+    revisados = [c for c in casos if c.get("revision")]
+    _escribir_csv(carpeta / "casos.csv", COLUMNAS_CASOS, [_fila_caso(c) for c in casos])
+    _escribir_csv(
+        carpeta / "revisiones.csv", COLUMNAS_REVISIONES, [_fila_revision(c) for c in revisados]
+    )
+    if not casos:
+        return ["Sin casos registrados: casos.csv y revisiones.csv solo traen las cabeceras."]
+    pendientes = sum(c["estado"] == "pendiente_revision" for c in casos)
+    return [
+        f"Casos: {len(casos)} casos registrados en total, {pendientes} pendientes de revision "
+        f"y {len(revisados)} revisado(s) (casos.csv y revisiones.csv)."
+    ]
+
+
 def _resumen(
     momento: datetime,
     commit: str,
@@ -313,8 +419,10 @@ def _resumen(
         "",
         "Esta version prepara los datos, entrena Isolation Forest con la parte de ajuste,",
         "elige los umbrales en validacion y evalua en la parte de prueba con el protocolo",
-        "de la seccion 15. Solo las cifras calculadas con el conjunto real en el computador",
-        "de ejecucion (N3) son resultados; las de la muestra para pruebas no lo son.",
+        "de la seccion 15. La API evalua transacciones (POST /evaluar) con el modelo",
+        "entrenado y registra casos y revisiones; el flujo de n8n que los usa llega en la",
+        "fase 5. Solo las cifras calculadas con el conjunto real en el computador de",
+        "ejecucion (N3) son resultados; las de la muestra para pruebas no lo son.",
         "",
     ]
     return "\n".join(lineas)
@@ -355,6 +463,7 @@ def reunir_evidencia(
     capturas = _copiar_carpeta(en_curso / "capturas", carpeta / "capturas", texto=False)
     notas += _copiar_datos(en_curso, carpeta)
     notas += _copiar_modelo_y_evaluacion(en_curso, carpeta)
+    notas += _exportar_casos(Path(raiz), carpeta)
     notas.append(f"Capturas de pantalla copiadas: {capturas}.")
 
     observaciones = en_curso / "OBSERVACIONES.md"
