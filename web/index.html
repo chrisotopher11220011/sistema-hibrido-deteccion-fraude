@@ -1,1 +1,235 @@
-<!doctype html><title>Simulador de verificación de transacciones</title><p>El sistema señala para revisión.</p>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Simulador de verificación de transacciones</title>
+  <link rel="preload" href="/recursos/fuentes/atkinson-hyperlegible-next.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/recursos/estilos.css">
+  <script>
+    // Tema y modo presentación antes de pintar, para que no parpadee.
+    try {
+      var t = localStorage.getItem('fraude.tema');
+      if (t === 'claro' || t === 'oscuro') document.documentElement.dataset.tema = t;
+      if (localStorage.getItem('fraude.presentacion') === '1') document.documentElement.dataset.presentacion = '';
+    } catch (e) {}
+  </script>
+  <script type="module" src="/recursos/app.js"></script>
+</head>
+<body>
+  <a class="saltar" href="#caso">Saltar al caso actual</a>
+
+  <header class="cabecera">
+    <div class="cabecera__titulo">
+      <h1>Simulador de verificación de transacciones</h1>
+      <p class="aviso" id="aviso">
+        <svg class="aviso__icono" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4.5M8 4.6v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>Simulación académica con datos públicos y sintéticos. El sistema señala transacciones para revisión humana; no confirma fraude ni bloquea operaciones.</span>
+      </p>
+    </div>
+    <div class="cabecera__preferencias" role="group" aria-label="Preferencias de la vista">
+      <button type="button" class="boton boton--discreto" id="boton-tema" aria-describedby="tema-actual">Tema</button>
+      <span class="oculto" id="tema-actual"></span>
+      <button type="button" class="boton boton--discreto" id="boton-presentacion" aria-pressed="false">Modo presentación</button>
+      <button type="button" class="boton boton--discreto" id="boton-atajos" aria-haspopup="dialog">Atajos de teclado</button>
+    </div>
+  </header>
+
+  <section class="mando" aria-labelledby="titulo-mando">
+    <h2 class="oculto" id="titulo-mando">Control de la simulación</h2>
+    <div class="mando__fila">
+      <button type="button" class="boton boton--principal" id="boton-iniciar" disabled>Iniciar simulación</button>
+      <button type="button" class="boton" id="boton-paso" disabled>Enviar una</button>
+      <label class="campo campo--en-linea" for="velocidad">
+        <span class="campo__etiqueta">Velocidad</span>
+        <select id="velocidad">
+          <option value="2000">1 cada 2 segundos</option>
+          <option value="1000" selected>1 por segundo</option>
+          <option value="500">2 por segundo</option>
+          <option value="200">5 por segundo</option>
+          <option value="0">Lo más rápido posible</option>
+        </select>
+      </label>
+      <button type="button" class="boton boton--discreto" id="boton-reiniciar" disabled>Reiniciar</button>
+    </div>
+    <div class="progreso" id="progreso" hidden>
+      <div class="progreso__barra" role="progressbar" aria-labelledby="progreso-texto" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" id="progreso-barra"><span></span></div>
+      <p class="progreso__texto" id="progreso-texto"></p>
+    </div>
+    <div class="estado" id="estado" data-tipo="cargando" role="status">
+      <p class="estado__titulo" id="estado-titulo">Cargando el lote de demostración…</p>
+      <p class="estado__detalle" id="estado-detalle"></p>
+    </div>
+  </section>
+
+  <main class="mesa">
+    <section class="boleta" id="caso" tabindex="-1" aria-labelledby="titulo-caso" data-vacia>
+      <h2 class="boleta__titulo" id="titulo-caso">Caso actual</h2>
+      <div class="boleta__vacia" id="caso-vacio">
+        <p>Aquí aparece cada transacción cuando el sistema la evalúa: el nivel que le asigna, sus razones y, después, la etiqueta real del conjunto.</p>
+        <p>Pulsa <strong>Iniciar simulación</strong> para enviar el lote, o prueba una transacción manual más abajo.</p>
+      </div>
+      <div class="boleta__contenido" id="caso-contenido" hidden>
+        <dl class="ficha">
+          <div><dt>Transacción</dt><dd id="caso-id"></dd></div>
+          <div><dt>Monto</dt><dd class="ficha__monto" id="caso-monto"></dd></div>
+          <div><dt>Datos</dt><dd id="caso-origen"></dd></div>
+        </dl>
+        <div class="veredicto">
+          <p class="sello" id="caso-sello" data-nivel=""></p>
+          <p class="veredicto__estado" id="caso-estado"></p>
+        </div>
+        <div class="razones">
+          <h3>Por qué</h3>
+          <ul id="caso-razones"></ul>
+          <p class="razones__explicacion" id="caso-explicacion"></p>
+        </div>
+        <div class="pista" id="caso-pista" hidden>
+          <h3 id="titulo-pista">Puntuación de anomalía frente a los umbrales</h3>
+          <svg class="pista__grafica" id="pista-svg" role="img" aria-labelledby="titulo-pista pista-texto" viewBox="0 0 400 64" preserveAspectRatio="none"></svg>
+          <p class="pista__texto" id="pista-texto"></p>
+        </div>
+        <div class="pesos" id="caso-pesos" hidden>
+          <h3>Variables que más pesaron en la puntuación</h3>
+          <p class="nota">Son componentes anónimos del conjunto: indican cuáles pesaron, no por qué.</p>
+          <ol class="pesos__lista" id="pesos-lista"></ol>
+        </div>
+        <div class="etiqueta" id="caso-etiqueta" aria-live="polite"></div>
+        <form class="revisar" id="caso-revisar" hidden>
+          <h3>Revisión humana de este caso</h3>
+          <div class="revisar__campos">
+            <label class="campo" for="caso-comentario"><span class="campo__etiqueta">Comentario (opcional)</span>
+              <input type="text" id="caso-comentario" maxlength="500" autocomplete="off"></label>
+          </div>
+          <div class="revisar__botones">
+            <button type="submit" class="boton" name="decision" value="sospecha_confirmada">Confirmar sospecha</button>
+            <button type="submit" class="boton" name="decision" value="sospecha_descartada">Descartar sospecha</button>
+          </div>
+          <p class="revisar__resultado" id="caso-revision-resultado" role="status"></p>
+        </form>
+      </div>
+    </section>
+
+    <aside class="cuadro" aria-labelledby="titulo-cuadro">
+      <h2 id="titulo-cuadro">Lo que va del lote</h2>
+      <dl class="contadores" id="contadores">
+        <div><dt>Analizadas</dt><dd id="c-analizadas">0</dd></div>
+        <div><dt>Señaladas para revisión</dt><dd id="c-alertas">0</dd></div>
+        <div><dt>Fraudes señalados</dt><dd id="c-vp">0</dd></div>
+        <div><dt>Fraudes no señalados</dt><dd id="c-fn">0</dd></div>
+        <div><dt>Falsas alarmas</dt><dd id="c-fp">0</dd></div>
+        <div><dt>Errores de evaluación</dt><dd id="c-errores">0</dd></div>
+      </dl>
+      <fieldset class="criterio">
+        <legend>Cuenta como señalada</legend>
+        <label><input type="radio" name="criterio" value="cualquier" checked> Cualquier alerta</label>
+        <label><input type="radio" name="criterio" value="prioritaria"> Solo alertas prioritarias</label>
+      </fieldset>
+      <table class="matriz" id="matriz">
+        <caption>Matriz de confusión de las transacciones originales mostradas</caption>
+        <thead>
+          <tr><td></td><th scope="col">Señalada</th><th scope="col">Sin alerta</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Fraude</th><td id="m-vp" data-celda="vp">0</td><td id="m-fn" data-celda="fn">0</td></tr>
+          <tr><th scope="row">Legítima</th><td id="m-fp" data-celda="fp">0</td><td id="m-vn" data-celda="vn">0</td></tr>
+        </tbody>
+      </table>
+      <p class="nota" id="nota-matriz">Solo cuentan las transacciones del conjunto original, que traen etiqueta. Es una ilustración con el lote mostrado, no una métrica del sistema.</p>
+    </aside>
+
+    <section class="graficas" aria-labelledby="titulo-graficas">
+      <h2 id="titulo-graficas">Cada transacción frente a sus umbrales</h2>
+      <ul class="leyenda" id="leyenda" aria-label="Leyenda de niveles"></ul>
+      <div class="lienzo" id="lienzo">
+        <canvas id="grafica-puntos" tabindex="0" role="img" aria-label="Puntuación de anomalía de cada transacción en orden de llegada, con los dos umbrales. Usa las flechas para recorrer los puntos; el historial tiene los mismos datos." aria-describedby="grafica-resumen"></canvas>
+        <div class="globo" id="globo" role="status" hidden></div>
+      </div>
+      <h3 class="graficas__sub" id="titulo-tiempo">Línea de tiempo de alertas</h3>
+      <canvas id="grafica-tiempo" role="img" aria-labelledby="titulo-tiempo grafica-resumen"></canvas>
+      <p class="nota" id="grafica-resumen">Aún no hay transacciones evaluadas.</p>
+    </section>
+
+    <section class="bandeja" aria-labelledby="titulo-bandeja">
+      <h2 id="titulo-bandeja">Bandeja de revisión</h2>
+      <p class="nota">Los casos señalados quedan pendientes hasta que una persona los revisa. Tu decisión se guarda en el registro de casos.</p>
+      <label class="campo" for="revisor"><span class="campo__etiqueta">Quién revisa</span>
+        <input type="text" id="revisor" maxlength="100" autocomplete="name" value="Revisor de la demostración"></label>
+      <p class="bandeja__vacia" id="bandeja-vacia">No hay casos pendientes de revisión.</p>
+      <ul class="bandeja__lista" id="bandeja-lista"></ul>
+      <p class="revisar__resultado" id="bandeja-resultado" role="status"></p>
+    </section>
+
+    <section class="manual" aria-labelledby="titulo-manual">
+      <h2 id="titulo-manual">Transacción manual</h2>
+      <p class="nota">Prueba la regla de monto alto con ubicación inusual. Se envía como dato sintético, sin etiqueta real.</p>
+      <form id="form-manual" novalidate>
+        <label class="campo" for="manual-monto"><span class="campo__etiqueta">Monto</span>
+          <input type="text" inputmode="decimal" id="manual-monto" required aria-describedby="manual-monto-ayuda manual-error" autocomplete="off" value="1250">
+          <span class="campo__ayuda" id="manual-monto-ayuda">Número mayor o igual a 0, por ejemplo 1250 o 1250,50.</span></label>
+        <label class="campo" for="manual-habitual"><span class="campo__etiqueta">País habitual</span>
+          <select id="manual-habitual"></select></label>
+        <label class="campo" for="manual-pais"><span class="campo__etiqueta">País de la transacción</span>
+          <select id="manual-pais"></select></label>
+        <button type="submit" class="boton boton--principal" id="manual-enviar">Evaluar transacción</button>
+        <p class="campo__error" id="manual-error" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="historial" aria-labelledby="titulo-historial">
+      <h2 id="titulo-historial">Historial</h2>
+      <p class="nota" id="historial-nota">Cada transacción evaluada, de la más reciente a la más antigua. Es la vista en texto de las gráficas.</p>
+      <div class="historial__marco" tabindex="0" role="region" aria-labelledby="titulo-historial">
+        <table class="tabla" id="tabla-historial">
+          <thead>
+            <tr>
+              <th scope="col">N.º</th><th scope="col">Transacción</th><th scope="col" class="num">Monto</th>
+              <th scope="col">Nivel</th><th scope="col" class="num">Puntuación</th><th scope="col">Etiqueta real</th><th scope="col">Resultado</th>
+            </tr>
+          </thead>
+          <tbody id="historial-cuerpo"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="sobre" aria-labelledby="titulo-sobre">
+      <h2 id="titulo-sobre">Qué hace este sistema y cuánto fiarse</h2>
+      <div class="sobre__columnas">
+        <div>
+          <h3>Qué hace</h3>
+          <p>Cada transacción pasa por dos señales. Las <strong>reglas</strong> fijas comprueban el monto y, en los datos sintéticos, si el país es distinto del habitual. El modelo <strong>Isolation Forest</strong> da una puntuación de anomalía: cuanto mayor, más rara es la transacción frente a las que vio al entrenar. n8n combina las dos señales en un nivel y deja el caso para revisión humana.</p>
+        </div>
+        <div>
+          <h3>Cuánto fiarse</h3>
+          <p id="sobre-modelo">Cargando el estado del modelo…</p>
+          <p>Una puntuación alta prioriza la revisión; no prueba el fraude. Los contadores de esta página solo describen el lote mostrado. Las métricas con intervalos de confianza están en <code>comparativa.md</code>, en la carpeta de evidencia.</p>
+        </div>
+        <div>
+          <h3>Qué no hace</h3>
+          <p>No bloquea operaciones ni se conecta a ningún banco. El conjunto original no trae ubicación ni moneda: la regla de ubicación solo se prueba con datos sintéticos, y el umbral de monto se aplica a la cifra tal cual.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <p>Prototipo académico de detección híbrida: reglas deterministas, Isolation Forest y n8n. <span id="pie-version"></span></p>
+  </footer>
+
+  <dialog class="dialogo" id="dialogo-atajos" aria-labelledby="titulo-atajos">
+    <h2 id="titulo-atajos">Atajos de teclado</h2>
+    <p>Funcionan cuando el foco no está en un campo de texto. Todo se puede hacer también con <kbd>Tab</kbd> y <kbd>Intro</kbd>.</p>
+    <dl class="atajos">
+      <div><dt><kbd>Espacio</kbd></dt><dd>Iniciar o pausar la simulación</dd></div>
+      <div><dt><kbd>S</kbd></dt><dd>Enviar una transacción</dd></div>
+      <div><dt><kbd>T</kbd></dt><dd>Cambiar el tema</dd></div>
+      <div><dt><kbd>P</kbd></dt><dd>Modo presentación</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>Mostrar esta ayuda</dd></div>
+      <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Recorrer los puntos de la gráfica (con el foco en ella)</dd></div>
+    </dl>
+    <label class="interruptor"><input type="checkbox" id="atajos-activos" checked> Atajos de una tecla activados</label>
+    <form method="dialog"><button class="boton boton--principal" value="cerrar">Cerrar</button></form>
+  </dialog>
+</body>
+</html>

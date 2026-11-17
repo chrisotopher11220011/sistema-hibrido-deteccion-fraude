@@ -23,6 +23,7 @@ from pathlib import Path
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from fraude import lote
 from fraude.demostrar import pedir_http
@@ -168,12 +169,18 @@ def montar(
     @router.post("/simulacion/transacciones")
     async def transacciones(request: Request):
         """Reenvia la transaccion al webhook de evaluacion y devuelve el caso."""
-        return _reenviar("/webhook/transaccion", "transacciones", request, await request.body())
+        # En un hilo aparte: n8n llama a /evaluar y /casos de esta misma API mientras se
+        # espera su respuesta; bloquear el bucle de eventos aqui seria un interbloqueo.
+        crudo = await request.body()
+        return await run_in_threadpool(
+            _reenviar, "/webhook/transaccion", "transacciones", request, crudo
+        )
 
     @router.post("/simulacion/revisiones")
     async def revisiones(request: Request):
         """Reenvia la decision del revisor al webhook de revision humana."""
-        return _reenviar("/webhook/revision", "revisiones", request, await request.body())
+        crudo = await request.body()
+        return await run_in_threadpool(_reenviar, "/webhook/revision", "revisiones", request, crudo)
 
     app.include_router(router)
     app.mount("/recursos", StaticFiles(directory=web), name="recursos")

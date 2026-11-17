@@ -304,3 +304,46 @@ def test_el_fallo_de_n8n_tambien_queda_registrado(raiz_api):
     (registro,) = _registro(raiz_api)
     assert registro["codigo"] == 502
     assert registro["respuesta"]["error"]["tipo"] == "n8n_no_disponible"
+
+
+# --- Sin interbloqueo: n8n llama a la API mientras la API espera a n8n --------------------
+
+
+def test_el_reenvio_no_bloquea_la_api(raiz_api):
+    import socket
+    import threading
+    import time
+    import urllib.request
+
+    import uvicorn
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        puerto = s.getsockname()[1]
+
+    def n8n_que_llama_a_la_api(metodo, url, cuerpo=None):
+        # Como el flujo real: consulta la API antes de responder.
+        with urllib.request.urlopen(f"http://127.0.0.1:{puerto}/salud", timeout=5) as r:
+            return 200, {**CASO, "salud": json.loads(r.read())["estado"]}
+
+    app = crear_app(raiz_api, url_n8n="http://n8n", pedir_n8n=n8n_que_llama_a_la_api)
+    servidor = uvicorn.Server(uvicorn.Config(app, port=puerto, log_level="warning"))
+    hilo = threading.Thread(target=servidor.run, daemon=True)
+    hilo.start()
+    try:
+        for _ in range(100):
+            if servidor.started:
+                break
+            time.sleep(0.05)
+        peticion = urllib.request.Request(
+            f"http://127.0.0.1:{puerto}/simulacion/transacciones",
+            data=json.dumps(TRANSACCION).encode(),
+            headers={"content-type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(peticion, timeout=15) as r:
+            cuerpo = json.loads(r.read())
+        assert cuerpo["salud"] == "ok"
+    finally:
+        servidor.should_exit = True
+        hilo.join(timeout=5)
