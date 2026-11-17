@@ -2,7 +2,7 @@
 
 Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por cierto sin haberlo visto en el computador de ejecución y cómo se comprobará. Estados: **pendiente**, **confirmado** o **refutado**. Solo la evidencia de una ejecución N3 confirma o refuta, salvo S10, que es un supuesto sobre N2.
 
-- **Última actualización:** 2026-11-17 (UTC), al cerrar la fase 2.
+- **Última actualización:** 2026-11-17 (UTC), al cerrar la fase 3.
 - **Evidencia N3 recibida hasta hoy:** ninguna.
 
 | N.º | Supuesto | Cómo se comprueba | Estado | Notas |
@@ -11,7 +11,7 @@ Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por 
 | S2 | Los puertos 5678 y 8000 están libres | Arranque; `anfitrion.json` anota los que ya estaban en escucha antes de arrancar | Pendiente | Se cambian con `FRAUDE_PUERTO_API` y `FRAUDE_PUERTO_N8N` |
 | S3 | OpenML responde y entrega el mismo conjunto que Kaggle | `datos.json`: 284.807 filas y 492 fraudes | Pendiente | Desde la fase 2, `preparar` lo comprueba. `huellas.sha256_contenido` no depende del formato ni de `Time`: si alguien prepara también con el CSV de Kaggle y sale la misma huella, el supuesto queda confirmado del todo |
 | S4 | La versión fijada de n8n importa y activa los flujos sin pasos manuales | N2 y, en N3, `RESUMEN.md` y `registros/n8n.log` | Pendiente | **Comprobado en N2** con n8n 2.47.7, también en un segundo arranque con el volumen ya creado. Falta N3 |
-| S5 | El entrenamiento termina en minutos | `modelo.json` | Pendiente | Fase 3 |
+| S5 | El entrenamiento termina en minutos | `modelo.json` (`tiempo_entrenamiento_s`) y `metricas.json` (`duracion_s`) | Pendiente | Ensayo N1 con un conjunto inventado del tamaño real (284.807 filas, 2 núcleos): `entrenar` cerca de 1 s y `evaluar` (mil remuestreos, diez semillas y partición temporal) unos 30 s, con menos de 1 GB de memoria. Son tiempos, no métricas: N3 lo confirma |
 | S6 | El flujo responde cada transacción en pocos segundos | `flujo.json` | Pendiente | Fase 5 |
 | S7 | Con `sudo`, los archivos de `resultados/` y `datos/` quedan a nombre del usuario | Punto de prueba A | Pendiente | En N2 se comprobó sin `sudo` y con `sudo ./fraude`. El caso de Omarchy (usuario normal y `sudo` solo para Docker) está probado en N1 con Docker simulado |
 | S8 | La página funciona en el Chrome de Omarchy | `simulacion.json` y `capturas/` | Pendiente | Fase 6 |
@@ -34,3 +34,12 @@ Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por 
 | S15 | El ARFF de OpenML 1597 se lee con el lector del proyecto: 31 atributos, `Class` nominal con `0` y `1`, valores numéricos separados por comas. El lector acepta comillas o su ausencia y la falta de `Time` | `datos.json`: `estado: ok`, `columnas` y `tiene_time` | Pendiente. Metadatos de OpenML leídos el 2026-11-17; el archivo en sí no pudo verse desde el entorno de desarrollo |
 | S16 | El archivo que sirve OpenML coincide con la suma MD5 que publica (`178bcf9b…`) | `datos.json`: `huellas.md5_coincide` | Pendiente. Si no coincide, `preparar` prueba la otra dirección y, si tampoco, falla sin dejar archivos a medias |
 | S17 | `preparar` con el conjunto real tarda segundos y cabe con holgura en 16 GB | `datos.json`: `duracion_s` | Pendiente. Ensayo N1 con un archivo inventado del mismo tamaño (168 MB): unos 2 s por ejecución, sin contar la descarga, y menos de 1 GB de memoria |
+
+## Supuestos nuevos de la fase 3
+
+| N.º | Supuesto | Cómo se comprueba | Estado |
+|---|---|---|---|
+| S18 | Con las versiones fijadas en `uv.lock`, SHAP explica exactamente la puntuación de Isolation Forest (la suma de contribuciones reconstruye `score_samples`) | Prueba `test_aditividad_con_la_version_instalada` en N1 y N2 | **Comprobado en N1 y N2** con scikit-learn 1.9.1 y SHAP 0.54.1. La imagen usa el mismo `uv.lock` |
+| S19 | Con los datos reales, la validación tiene fraudes suficientes para elegir los umbrales (se esperan unos 69) y la partición temporal tiene fraudes en sus tres tramos | `modelo.json` (`datos.fraudes_validacion`) y `metricas.json` (`temporal.partes`) | Pendiente. Si un tramo temporal no tiene fraudes, la partición temporal queda como `fallo` con su motivo y el resto sigue |
+| S20 | `k = 100` es un cupo razonable de casos para un revisor | `metricas.json` (`protocolo.k_revision`) | Pendiente. Valor del manual de la ULB (por día y por tarjetas); aquí se aplica a transacciones. Se revisa con el equipo antes de la ponencia |
+

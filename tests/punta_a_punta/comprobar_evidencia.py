@@ -21,7 +21,19 @@ ARCHIVOS = (
     "OBSERVACIONES.md",
     "datos.json",
     "eda/resumen.json",
+    "modelo.json",
+    "metricas.json",
+    "comparativa.md",
+    "analisis_errores/resumen.json",
+    "analisis_errores/fraudes_no_detectados.csv",
+    "analisis_errores/falsas_alarmas.csv",
 )
+FIGURAS = {
+    "comparativa_prueba.png",
+    "curva_pr_prueba.png",
+    "semillas.png",
+    "umbral_validacion.png",
+}
 
 
 def main() -> int:
@@ -58,6 +70,26 @@ def main() -> int:
             fallos.append("en la CI los datos deben ser la muestra, marcada no reportable")
         if not list((carpeta / "eda").glob("*.png")):
             fallos.append("eda/ no trae figuras")
+        for nombre in ("modelo.json", "metricas.json"):
+            informe = json.loads((carpeta / nombre).read_text())
+            if informe.get("estado") != "ok":
+                fallos.append(f"{nombre} no termino bien: {informe.get('error')}")
+            elif informe.get("reportable") is not False:
+                fallos.append(f"en la CI {nombre} debe venir de la muestra, marcada no reportable")
+        metricas = json.loads((carpeta / "metricas.json").read_text())
+        if metricas.get("estado") == "ok":
+            principal = metricas["principal"]
+            if len(principal["configuraciones"]) != 4 or len(principal["lineas_base"]) != 3:
+                fallos.append("metricas.json no trae las cuatro configuraciones y tres lineas base")
+            if len(metricas["semillas"]["por_semilla"]) != 10:
+                fallos.append("metricas.json no trae las diez semillas")
+            if metricas["analisis_errores"]["parte"] != "validacion":
+                fallos.append("el analisis de errores no sale de validacion")
+        if "no es un resultado" not in (carpeta / "comparativa.md").read_text().lower():
+            fallos.append("comparativa.md no avisa de que la muestra no es un resultado")
+        figuras = {p.name for p in (carpeta / "figuras").glob("*.png")}
+        if figuras != FIGURAS:
+            fallos.append(f"figuras/ trae {sorted(figuras)}")
         sinteticos = DATOS / "sinteticos" / "ubicacion.json"
         if not sinteticos.is_file():
             fallos.append("falta datos/sinteticos/ubicacion.json")

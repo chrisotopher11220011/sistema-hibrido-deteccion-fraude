@@ -12,22 +12,21 @@ naranja para fraudes; el rojo queda reservado para estados).
 import json
 from pathlib import Path
 
-import matplotlib
+import numpy as np
+import pandas as pd
 
-matplotlib.use("Agg")
+from fraude.graficas import (
+    COLOR_FRAUDE,
+    COLOR_LEGITIMA,
+    REJILLA,
+    TEXTO,
+    TEXTO_SECUNDARIO,
+)
+from fraude.graficas import ejes as _ejes
+from fraude.graficas import guardar as _guardar
+from fraude.graficas import titulo as _titulo
+from fraude.transaccion import VARIABLES
 
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-
-from fraude.transaccion import VARIABLES  # noqa: E402
-
-COLOR_LEGITIMA = "#2a78d6"  # categorico, posicion 1
-COLOR_FRAUDE = "#eb6834"  # categorico, posicion 2
-SUPERFICIE = "#fcfcfb"
-TEXTO = "#0b0b0b"
-TEXTO_SECUNDARIO = "#52514e"
-REJILLA = "#e4e3df"
 AVISO = "Parte de ajuste. Descriptivo: no es una metrica de deteccion."
 AVISO_FIGURA = "Parte de ajuste. Descriptivo, no es una métrica de detección."
 
@@ -90,31 +89,6 @@ def resumir(ajuste: pd.DataFrame, umbral_monto: float) -> dict:
         "separacion": _separacion(ajuste),
         "notas": notas,
     }
-
-
-def _ejes(ancho: float = 8, alto: float = 4.5):
-    figura, ejes = plt.subplots(figsize=(ancho, alto), dpi=110)
-    figura.patch.set_facecolor(SUPERFICIE)
-    ejes.set_facecolor(SUPERFICIE)
-    for lado in ("top", "right"):
-        ejes.spines[lado].set_visible(False)
-    for lado in ("left", "bottom"):
-        ejes.spines[lado].set_color(REJILLA)
-    ejes.tick_params(colors=TEXTO_SECUNDARIO, labelsize=9)
-    ejes.grid(axis="y", color=REJILLA, linewidth=0.8)
-    ejes.set_axisbelow(True)
-    return figura, ejes
-
-
-def _titulo(figura, ejes, titulo: str, subtitulo: str) -> None:
-    ejes.set_title(subtitulo, loc="left", fontsize=9, color=TEXTO_SECUNDARIO, pad=8)
-    figura.suptitle(titulo, x=0.02, ha="left", fontsize=12, color=TEXTO, fontweight="bold")
-
-
-def _guardar(figura, ruta: Path) -> None:
-    figura.tight_layout()
-    figura.savefig(ruta, facecolor=SUPERFICIE)
-    plt.close(figura)
 
 
 def _figura_montos(ajuste: pd.DataFrame, umbral: float, ruta: Path) -> None:

@@ -49,8 +49,11 @@ Uso: ./fraude <comando>
 
   preparar [--muestra]
               Descarga y verifica los datos, crea la particion y el analisis exploratorio.
-  entrenar | evaluar | demostrar
-              Pasos sueltos. Se activan en fases posteriores del proyecto.
+  entrenar [--muestra]
+              Entrena Isolation Forest con la parte de ajuste y elige los umbrales.
+  evaluar [--muestra]
+              Calcula las metricas, la comparativa, las figuras y el analisis de errores.
+  demostrar   Paso suelto. Se activa en la fase 5.
 
 Lo habitual: ./fraude todo, usar la pagina, ./fraude evidencia y ./fraude apagar.
 La guia paso a paso esta en EJECUTAR.md.
@@ -133,7 +136,8 @@ preparar_carpetas() {
 
 nueva_sesion() {
     rm -rf "$EN_CURSO/registros" "$EN_CURSO/capturas" "$EN_CURSO/pasos.json" "$EN_CURSO/.puertos_antes" \
-        "$EN_CURSO/datos.json" "$EN_CURSO/eda"
+        "$EN_CURSO/datos.json" "$EN_CURSO/eda" "$EN_CURSO/modelo.json" "$EN_CURSO/metricas.json" \
+        "$EN_CURSO/comparativa.md" "$EN_CURSO/figuras" "$EN_CURSO/analisis_errores"
     if [ -f "$EN_CURSO/OBSERVACIONES.md" ]; then
         mkdir -p "$EN_CURSO/anteriores"
         mv "$EN_CURSO/OBSERVACIONES.md" "$EN_CURSO/anteriores/OBSERVACIONES-$(date -u +%Y%m%dT%H%M%SZ).md"

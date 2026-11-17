@@ -20,7 +20,7 @@ Página de simulación (navegador)
                                              +-------------------------------------+
 ```
 
-## Hoy (versión 0.2.0)
+## Hoy (versión 0.3.0)
 
 ```
 Computador de ejecución (Omarchy 4)
@@ -35,6 +35,7 @@ Computador de ejecución (Omarchy 4)
       │                   arranque.sh: importar flujos → publicar → n8n start
       └─ tareas ......... línea de comandos (perfil «tareas», sin puerto)
                           preparar: datos, partición, análisis exploratorio, sintéticos
+                          entrenar: Isolation Forest y umbrales; evaluar: sección 15
                           comprueba api y n8n por la red interna y reúne la evidencia
 ```
 
@@ -46,8 +47,8 @@ datos/crudos/creditcard.csv (Kaggle, a mano) ─┴─> leer y verificar (conteo
                                                      │
                      partición estratificada 56/14/30, índices guardados
                        ├─ ajuste ──────> análisis exploratorio (resultados/en_curso/eda/)
-                       ├─ validación     (umbrales y análisis de errores: fase 3)
-                       └─ prueba         (solo métricas agregadas: fase 3)
+                       ├─ validación ──> umbrales (entrenar) y analisis_errores/ (evaluar)
+                       └─ prueba ──────> solo métricas agregadas (evaluar)
 
 generador sintético ──> datos/sinteticos/ubicacion.json ──> comprobación funcional de la regla
                         (origen «sintetico», sin variables; nunca junto a los originales)
@@ -58,6 +59,7 @@ generador sintético ──> datos/sinteticos/ubicacion.json ──> comprobaci�
 | `datos/crudos/`, `datos/preparados/` | Conjunto real, su huella, la partición y `origen.json` |
 | `datos/muestra/` | Muestra para pruebas (N1 y N2), con la misma estructura |
 | `datos/sinteticos/` | Transacciones sintéticas de ubicación |
+| `datos/modelo/`, `datos/muestra/modelo/` | Artefacto del modelo (`modelo.joblib`) y su `modelo.json` |
 
 | Módulo de `src/fraude/` | Responsabilidad |
 |---|---|
@@ -68,6 +70,12 @@ generador sintético ──> datos/sinteticos/ubicacion.json ──> comprobaci�
 | `muestra.py`, `sinteticos.py` | Muestra para pruebas y transacciones sintéticas |
 | `eda.py` | Análisis exploratorio y figuras de la parte de ajuste |
 | `preparar.py` | Orquesta el paso y escribe `datos.json` |
+| `modelo.py` | Isolation Forest, puntuación, umbrales y artefacto (sección 11, ADR 0008) |
+| `contribuciones.py` | Contribución por variable con SHAP para árboles (ADR 0012) |
+| `decision.py` | Copia en Python de la tabla de decisión (sección 8.4) |
+| `metricas.py` | Métricas con pesos, *bootstrap* estratificado e intervalos |
+| `entrenar.py` | Orquesta el entrenamiento y escribe `modelo.json` |
+| `evaluar.py`, `comparativa.py`, `figuras.py`, `graficas.py` | Protocolo de la sección 15, `metricas.json`, `comparativa.md`, figuras y análisis de errores |
 
 | Pieza | Archivos |
 |---|---|
