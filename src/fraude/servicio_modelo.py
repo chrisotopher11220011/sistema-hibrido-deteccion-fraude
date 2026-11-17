@@ -166,6 +166,10 @@ class ServicioModelo:
 
     def evaluar(self, fila: dict[str, float]) -> dict:
         """Parte `modelo` de la respuesta 8.3 para una fila con todas las variables."""
+        return self.evaluar_con_version(fila)[0]
+
+    def evaluar_con_version(self, fila: dict[str, float]) -> tuple[dict, str]:
+        """Como `evaluar`, junto con la version del modelo que de verdad puntuo la fila."""
         cargado = self._actualizar()
         if cargado is None:
             raise ModeloNoDisponible(self._motivo)
@@ -187,4 +191,4 @@ class ServicioModelo:
             resultado["contribuciones"] = explicador.contribuciones(
                 X, cargado.variables, cargado.k
             )[0]
-        return resultado
+        return resultado, str(cargado.meta["version"])
