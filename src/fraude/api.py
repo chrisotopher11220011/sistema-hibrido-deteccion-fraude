@@ -9,14 +9,17 @@ import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 
 from fraude import __version__
+from fraude.casos import CasoNuevo, Revision
 from fraude.configuracion import cargar
 from fraude.errores import ErrorApi, detalles_validacion, id_del_cuerpo, respuesta_error
 from fraude.evaluacion import ModeloNoDisponible, evaluar_transaccion
+from fraude.registro import CasoNoEncontrado, CasoYaRevisado, RegistroCasos
 from fraude.servicio_modelo import ServicioModelo
 from fraude.transaccion import Transaccion
 
@@ -33,10 +36,17 @@ def _raiz_por_defecto() -> Path:
     return Path(os.environ.get("FRAUDE_RAIZ", "/trabajo"))
 
 
+def ruta_bd_casos(raiz: Path) -> Path:
+    """`FRAUDE_BD_CASOS` o `datos/casos/casos.sqlite` bajo la raiz."""
+    propia = os.environ.get("FRAUDE_BD_CASOS")
+    return Path(propia) if propia else Path(raiz) / "datos" / "casos" / "casos.sqlite"
+
+
 def crear_app(raiz: Path | None = None, modo_modelo: str | None = None) -> FastAPI:
     """API sobre `raiz`. `modo_modelo`: `auto`, `real` o `muestra` (`FRAUDE_MODELO`)."""
     raiz = Path(raiz) if raiz is not None else _raiz_por_defecto()
     servicio = ServicioModelo(raiz, modo_modelo or os.environ.get("FRAUDE_MODELO", "auto"))
+    registro = RegistroCasos(ruta_bd_casos(raiz))
 
     app = FastAPI(
         title="Deteccion hibrida de fraude (prototipo academico)",
@@ -46,6 +56,7 @@ def crear_app(raiz: Path | None = None, modo_modelo: str | None = None) -> FastA
     )
     app.state.raiz = raiz
     app.state.servicio_modelo = servicio
+    app.state.registro = registro
 
     @app.exception_handler(RequestValidationError)
     async def _entrada_invalida(_: Request, error: RequestValidationError):
@@ -88,6 +99,31 @@ def crear_app(raiz: Path | None = None, modo_modelo: str | None = None) -> FastA
             registro_api.exception("Fallo al evaluar %s", id_t)
             mensaje = f"No se pudo evaluar la transaccion: {error}"
             raise ErrorApi("error_interno", mensaje, id_transaccion=id_t) from error
+
+    @app.post("/casos", status_code=201)
+    def crear_caso(caso: CasoNuevo) -> dict:
+        """Registra el caso que calculo n8n. `sin_alerta` se cierra solo."""
+        # Sin los campos no enviados: las senales quedan tal como las devolvio /evaluar.
+        return registro.crear(caso.model_dump(mode="json", exclude_unset=True))
+
+    @app.get("/casos")
+    def listar_casos(
+        estado: Literal["cerrado", "pendiente_revision", "revisado"] | None = None,
+        limite: int = Query(100, ge=1, le=1000),
+    ) -> dict:
+        """Casos del mas reciente al mas antiguo, con filtro opcional por estado."""
+        return registro.listar(estado, limite)
+
+    @app.post("/casos/{id_caso}/revision")
+    def revisar_caso(id_caso: str, revision: Revision) -> dict:
+        """Decision del revisor sobre un caso pendiente de revision."""
+        try:
+            return registro.revisar(id_caso, revision.model_dump())
+        except CasoNoEncontrado as error:
+            raise ErrorApi("caso_no_encontrado", f"No existe el caso {id_caso}.") from error
+        except CasoYaRevisado as error:
+            mensaje = f"El caso no esta pendiente de revision ({error}); no se cambia."
+            raise ErrorApi("caso_ya_revisado", mensaje) from error
 
     return app
 
