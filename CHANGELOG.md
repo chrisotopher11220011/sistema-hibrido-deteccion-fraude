@@ -6,6 +6,30 @@ Cada entrada indica su nivel de verificación: N1 (entorno de desarrollo), N2 (G
 
 ## [Sin publicar]
 
+## [0.6.0] - 2026-11-17
+
+Fase 6, página de simulación. Lo comprobado en la CI usa la muestra para pruebas: confirma que la página funciona, es accesible y habla con n8n a través de la API, no mide la detección de fraude.
+
+### Añadido
+
+- Página de simulación en `GET /` (`web/`): boleta del caso actual con sello del nivel, razones, explicación, puntuación frente a los umbrales y variables que más pesaron; etiqueta real mostrada después del veredicto; contadores y matriz de confusión del lote mostrado, con «cualquier alerta» o «solo prioritarias»; puntuación de cada transacción frente a sus umbrales y línea de tiempo de alertas; bandeja de revisión; transacción manual; historial; panel «Qué hace este sistema y cuánto fiarse» (N1; N2 con la muestra).
+- Sistema de diseño en `web/DISENO.md` (skill `frontend-design`): papel de seguridad, tinta de billete y sello violeta; Atkinson Hyperlegible Next (SIL OFL 1.1) incluida; colores de los niveles validados con la skill `dataviz` en los dos temas; cada nivel con forma, icono y nombre.
+- Temas claro y oscuro (los del sistema por defecto), modo presentación para proyector, uso completo con teclado con atajos desactivables, foco visible, «reducir movimiento» respetado, estados vacío, cargando, en pausa, fin de lote y error con qué hacer (N1; N2).
+- Rutas `GET /simulacion/lote`, `POST /simulacion/transacciones` y `POST /simulacion/revisiones`: reenvían a los webhooks de n8n por la red interna (ADR 0007). Un cuerpo con `etiqueta_real` se rechaza sin reenviarlo. Errores nuevos `lote_no_disponible`, `etiqueta_en_transaccion` y `n8n_no_disponible`; esquema `lote` (ADR 0015) (N1; N2).
+- `simulacion.json` en la evidencia: cada sesión de la página, lo enviado, lo respondido, la latencia y la comparación con la etiqueta, unida desde el lote al reunir la evidencia (N1; N2).
+- CI: la página en Chromium con Playwright: recorrido con teclado, etiqueta nunca enviada y mostrada después del veredicto, estados de error, axe-core (WCAG 2.2 A y AA) sin violaciones, sin desbordamiento horizontal, y capturas en 640, 1280 y 1920 px por dos temas, más el modo presentación (artefacto `capturas-pagina` y hoja de contactos en el registro).
+- n8n de pruebas para N1 (`tests/punta_a_punta/n8n_de_pruebas.py`): ejecuta los flujos reales con el simulador de la fase 5 contra una API en marcha.
+- `docs/interfaz-evaluacion.md`: revisión frente a las pautas de Amershi et al. (2019), accesibilidad y plan del SUS.
+- `EJECUTAR.md` para el punto de prueba C.
+
+### Corregido
+
+- El reenvío a n8n bloqueaba el bucle de eventos de la API mientras n8n llamaba a `/evaluar` de la misma API: interbloqueo. Ahora corre en un hilo aparte, con prueba sobre un servidor real (N1).
+
+### Cambiado
+
+- `compose.yaml`: `FRAUDE_URL_N8N` en `api`. La imagen incluye `web/`. La versión del flujo de evaluación pasa a `transaccion-0.6.0`.
+
 ## [0.5.0] - 2026-11-17
 
 Fase 5, flujos de n8n. Lo comprobado en la CI usa la muestra para pruebas: confirma que los flujos funcionan y que n8n y Python clasifican igual, no mide la detección de fraude.

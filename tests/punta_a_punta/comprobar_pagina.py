@@ -247,6 +247,23 @@ def prueba_movimiento(c: Comprobacion, navegador, base: str) -> None:
         "() => getComputedStyle(document.getElementById('caso-sello')).animationName"
     )
     c.anotar("con «reducir movimiento» no hay animaciones", animacion == "none", animacion)
+
+    # Fluidez con miles de transacciones: se replica el caso hasta 5.000 y se mide el repintado.
+    ms = pagina.evaluate(
+        """() => {
+            const s = window.__simulacion;
+            const base = s.estado.registros[0];
+            const niveles = ['sin_alerta', 'revision_recomendada', 'alerta_prioritaria'];
+            for (let i = 1; i < 5000; i++) {
+                s.estado.registros.push({ ...base, orden: i + 1, nivel: niveles[i % 3],
+                    puntuacion: 0.35 + (i % 97) / 300 });
+            }
+            const t0 = performance.now();
+            for (let k = 0; k < 5; k++) { s.dibujarGraficas(); s.actualizarContadores(); }
+            return (performance.now() - t0) / 5;
+        }"""
+    )
+    c.anotar("repintado fluido con 5.000 transacciones (< 100 ms)", ms < 100, f"{ms:.1f} ms")
     contexto.close()
 
 

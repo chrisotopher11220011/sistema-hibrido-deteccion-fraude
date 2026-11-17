@@ -102,31 +102,31 @@ Leyenda siempre presente en la gráfica de puntos (varias series). Información 
 
 ### Tarea 1: rutas de simulación en la API
 
-- [ ] Pruebas (`tests/unitarias/test_simulacion.py`): `GET /` devuelve HTML con el aviso; `/recursos/estilos.css` existe; lote 404 sin lote, 200 con el real o la muestra según el modo; reenvío con n8n simulado (200, 502 con caso, n8n caído → 502 `n8n_no_disponible`); 422 con `etiqueta_real`; revisión reenviada con su código; cada intercambio queda en `simulacion.jsonl`.
-- [ ] Implementar `src/fraude/simulacion.py` y montarlo en `api.py`.
-- [ ] `compose.yaml`: `FRAUDE_URL_N8N` en `api`. `Dockerfile`: copiar `web/`.
+- [x] Pruebas (`tests/unitarias/test_simulacion.py`): `GET /` devuelve HTML con el aviso; `/recursos/estilos.css` existe; lote 404 sin lote, 200 con el real o la muestra según el modo; reenvío con n8n simulado (200, 502 con caso, n8n caído → 502 `n8n_no_disponible`); 422 con `etiqueta_real`; revisión reenviada con su código; cada intercambio queda en `simulacion.jsonl`.
+- [x] Implementar `src/fraude/simulacion.py` y montarlo en `api.py`.
+- [x] `compose.yaml`: `FRAUDE_URL_N8N` en `api`. `Dockerfile`: copiar `web/`.
 
 ### Tarea 2: `simulacion.json` en la evidencia
 
-- [ ] Pruebas en `test_evidencia.py`: sin registro → nota; con registro → sesiones, intercambios, comparación con la etiqueta del lote; tokens enmascarados.
-- [ ] Implementar en `evidencia.py`.
+- [x] Pruebas en `test_evidencia.py`: sin registro → nota; con registro → sesiones, intercambios, comparación con la etiqueta del lote; tokens enmascarados.
+- [x] Implementar en `evidencia.py`.
 
 ### Tarea 3: la página
 
-- [ ] Pruebas estáticas (`tests/unitarias/test_web.py`): sin direcciones externas, sin frases prohibidas, aviso fijo presente, la página no envía `etiqueta_real` (el código solo envía `elemento.transaccion`), fuentes con su licencia.
-- [ ] `web/index.html`, `web/estilos.css` (sistema de diseño con tokens), `web/app.js`, `web/fuentes/`, `web/DISENO.md`.
+- [x] Pruebas estáticas (`tests/unitarias/test_web.py`): sin direcciones externas, sin frases prohibidas, aviso fijo presente, la página no envía `etiqueta_real` (el código solo envía `elemento.transaccion`), fuentes con su licencia.
+- [x] `web/index.html`, `web/estilos.css` (sistema de diseño con tokens), `web/app.js`, `web/fuentes/`, `web/DISENO.md`.
 
 ### Tarea 4: capturas y accesibilidad
 
-- [ ] `tests/punta_a_punta/n8n_de_pruebas.py` (solo N1).
-- [ ] `tests/punta_a_punta/comprobar_pagina.py`: recorre la página con Playwright, solo con teclado; axe-core; capturas en `resultados/en_curso/capturas_ci/`.
-- [ ] CI: paso nuevo tras `todo --muestra`; las capturas se suben como artefacto.
-- [ ] Mirar las capturas y corregir.
+- [x] `tests/punta_a_punta/n8n_de_pruebas.py` (solo N1).
+- [x] `tests/punta_a_punta/comprobar_pagina.py`: recorre la página con Playwright, solo con teclado; axe-core; capturas en `resultados/en_curso/capturas_ci/`.
+- [x] CI: paso nuevo tras `todo --muestra`; las capturas se suben como artefacto.
+- [x] Mirar las capturas y corregir.
 
 ### Tarea 5: documentos y cierre
 
-- [ ] `docs/interfaz-evaluacion.md` (Amershi et al., 2019), ADR 0015, `EJECUTAR.md`, `README.md`, `CHANGELOG.md`, `docs/ESTADO.md`, `docs/supuestos.md`, versión 0.6.0.
-- [ ] Revisión con subagente de contexto limpio, Pull Request sobre `fase-5-flujos-n8n`, CI en verde.
+- [x] `docs/interfaz-evaluacion.md` (Amershi et al., 2019), ADR 0015, `EJECUTAR.md`, `README.md`, `CHANGELOG.md`, `docs/ESTADO.md`, `docs/supuestos.md`, versión 0.6.0.
+- [x] Revisión con subagente de contexto limpio, Pull Request sobre `fase-5-flujos-n8n`, CI en verde.
 
 ## Revisión dirigida
 

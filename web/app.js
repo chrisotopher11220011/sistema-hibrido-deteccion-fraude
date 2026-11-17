@@ -1038,5 +1038,5 @@ actualizarContadores();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => dibujarGraficas());
 cargar();
 
-// Para las pruebas automáticas de la página (capturas y teclado): solo lectura.
-window.__simulacion = { estado };
+// Para las pruebas automáticas de la página (capturas, teclado y fluidez).
+window.__simulacion = { estado, dibujarGraficas, actualizarContadores };

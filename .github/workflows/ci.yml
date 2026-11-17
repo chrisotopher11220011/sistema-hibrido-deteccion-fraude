@@ -101,12 +101,17 @@ jobs:
       - name: Playwright y axe-core para la pagina
         run: |
           python3 -m venv /tmp/pw
-          /tmp/pw/bin/pip install --quiet playwright==1.63.0
+          /tmp/pw/bin/pip install --quiet playwright==1.63.0 pillow==13.0.0
           /tmp/pw/bin/playwright install --with-deps chromium
           mkdir -p /tmp/axe && cd /tmp/axe && npm pack --silent axe-core@4.14.1 && tar xzf axe-core-4.14.1.tgz
 
       - name: Pagina de simulacion (teclado, accesibilidad y capturas)
         run: /tmp/pw/bin/python tests/punta_a_punta/comprobar_pagina.py http://127.0.0.1:8000 --axe /tmp/axe/package/axe.min.js --salida capturas_ci
+
+      # El entorno de desarrollo lee este registro pero no descarga artefactos.
+      - name: Hoja de contactos de las capturas (en el registro)
+        if: always()
+        run: /tmp/pw/bin/python tests/punta_a_punta/hoja_capturas.py capturas_ci
 
       - name: Subir las capturas de la pagina
         if: always()
