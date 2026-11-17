@@ -35,3 +35,30 @@ sinteticos:
   semilla: 2026
   paises: [EC, CO, PE, US, ES, MX]
   monto_maximo: 5000
+
+# Isolation Forest (docs/spec.md, seccion 11). Parametros iniciales: los del articulo original
+# (Liu, Ting y Zhou, 2008) y por defecto en scikit-learn. Se entrena con la parte de ajuste.
+isolation_forest:
+  n_estimators: 100
+  max_samples: 256
+  max_features: 1.0
+  bootstrap: false
+  n_jobs: -1
+
+# Contribucion por variable (ADR 0012): cuantas variables se informan por alerta.
+contribuciones:
+  k: 5
+
+# Evaluacion (docs/spec.md, seccion 15; ADR 0011). Sin metas numericas.
+evaluacion:
+  remuestreos: 1000              # bootstrap estratificado de la parte de prueba
+  confianza: 0.95
+  semilla_bootstrap: 11
+  semilla_azar: 13               # linea base «alertar al azar»
+  k_revision: 100                # cupo de casos de un revisor: precision en los k primeros
+  # Diez semillas para medir la estabilidad del entrenamiento (la principal es `semilla`).
+  semillas: [42, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  # Particion temporal secundaria: mismas proporciones que la principal, en orden de Time.
+  temporal: true
+  # Maximo de filas por archivo de analisis de errores (las de mayor puntuacion primero).
+  max_filas_errores: 5000
