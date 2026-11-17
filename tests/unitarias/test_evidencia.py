@@ -378,3 +378,102 @@ def test_flujo_con_fallo_queda_en_el_resumen(tmp_path):
 def test_sin_demostrar_lo_anota(tmp_path):
     resumen = (reunir(tmp_path) / "RESUMEN.md").read_text()
     assert "Sin flujo.json" in resumen
+
+
+# --- simulacion.json (fase 6) ---------------------------------------------------------
+
+
+def _intercambio(n, id_t, nivel, sesion="s1", codigo=200, ruta="transacciones", **otros):
+    respuesta = {"id_caso": f"c-{n:012x}", "id_transaccion": id_t, "nivel": nivel}
+    return {
+        "fecha": f"2026-11-17T10:00:{n:02d}.00Z",
+        "sesion": sesion,
+        "n": n,
+        "ruta": ruta,
+        "enviado": {"id_transaccion": id_t, "origen": "original", "monto": 1.0},
+        "codigo": codigo,
+        "respuesta": respuesta,
+        "latencia_ms": 10.0 * n,
+        **otros,
+    }
+
+
+def _dejar_simulacion(raiz, intercambios, lote_elementos):
+    en_curso = raiz / "resultados" / "en_curso"
+    en_curso.mkdir(parents=True, exist_ok=True)
+    lineas = [json.dumps(i) for i in intercambios]
+    (en_curso / "simulacion.jsonl").write_text("\n".join(lineas) + "\n", encoding="utf-8")
+    destino = raiz / "datos" / "muestra" / "demostracion" / "lote.json"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(json.dumps({"fuente": "muestra", "elementos": lote_elementos}))
+
+
+def _elemento(id_t, etiqueta, tipo="original"):
+    return {
+        "tipo": tipo,
+        "etiqueta_real": etiqueta,
+        "transaccion": {"id_transaccion": id_t},
+    }
+
+
+def test_simulacion_json_con_sesiones_y_comparacion_con_la_etiqueta(tmp_path):
+    intercambios = [
+        _intercambio(1, "t-1", "alerta_prioritaria"),  # fraude senalado
+        _intercambio(2, "t-2", "revision_recomendada"),  # falsa alarma (cualquier alerta)
+        _intercambio(3, "t-3", "sin_alerta"),  # fraude no senalado
+        _intercambio(4, "t-4", "sin_alerta"),  # legitima sin alerta
+        _intercambio(5, "s-1", "alerta_prioritaria"),  # sintetica: sin etiqueta
+        _intercambio(6, "t-5", "error_evaluacion"),  # sin veredicto
+        _intercambio(7, None, None, ruta="revisiones", sesion="s1"),
+        _intercambio(8, "t-1", "sin_alerta", sesion="s2"),
+    ]
+    elementos = [
+        _elemento("t-1", 1),
+        _elemento("t-2", 0),
+        _elemento("t-3", 1),
+        _elemento("t-4", 0),
+        _elemento("t-5", 0),
+        _elemento("s-1", None, "sintetico"),
+    ]
+    _dejar_simulacion(tmp_path, intercambios, elementos)
+
+    carpeta = reunir(tmp_path)
+
+    sim = json.loads((carpeta / "simulacion.json").read_text())
+    assert sim["estado"] == "ok"
+    assert sim["reportable"] is False
+    assert sim["intercambios_total"] == 8
+    s1, s2 = sim["sesiones"]
+    assert s1["sesion"] == "s1" and s2["sesion"] == "s2"
+    assert s1["transacciones"] == 6 and s1["revisiones"] == 1
+    comparacion = s1["comparacion"]
+    assert comparacion["cualquier_alerta"] == {"vp": 1, "fp": 1, "fn": 1, "vn": 1}
+    assert comparacion["solo_prioritaria"] == {"vp": 1, "fp": 0, "fn": 1, "vn": 2}
+    assert comparacion["sin_etiqueta"] == 1
+    assert comparacion["sin_veredicto"] == 1
+    assert s1["latencia_ms"]["n"] == 6
+    assert s2["comparacion"]["cualquier_alerta"]["fn"] == 1
+    primero = sim["intercambios"][0]
+    assert primero["etiqueta_real"] == 1
+    assert "simulacion.json" in (carpeta / "RESUMEN.md").read_text()
+
+
+def test_simulacion_json_enmascara_secretos_y_salta_lineas_rotas(tmp_path):
+    revision = _intercambio(1, None, None, ruta="revisiones")
+    revision["enviado"] = {"id_caso": "c-1", "comentario": "TOKEN=abc123"}
+    _dejar_simulacion(tmp_path, [revision], [])
+    with (tmp_path / "resultados" / "en_curso" / "simulacion.jsonl").open("a") as archivo:
+        archivo.write("{linea rota\n")
+
+    sim = json.loads((reunir(tmp_path) / "simulacion.json").read_text())
+
+    assert "abc123" not in json.dumps(sim)
+    assert sim["lineas_ilegibles"] == 1
+
+
+def test_sin_sesiones_de_la_pagina_lo_anota(tmp_path):
+    carpeta = reunir(tmp_path)
+
+    sim = json.loads((carpeta / "simulacion.json").read_text())
+    assert sim["estado"] == "sin_sesiones"
+    assert "pagina" in (carpeta / "RESUMEN.md").read_text()

@@ -1,9 +1,11 @@
 """Comprueba, en la CI, la carpeta de evidencia mas reciente (N2).
 
 Uso: python tests/punta_a_punta/comprobar_evidencia.py [--con-anfitrion] [--con-casos]
+                                                       [--con-simulacion]
 
 `--con-casos` exige al menos un caso y una revision en casos.csv y revisiones.csv (los deja
-tests/punta_a_punta/comprobar_api.py).
+tests/punta_a_punta/comprobar_api.py). `--con-simulacion` exige una sesion de la pagina con
+transacciones comparadas con la etiqueta en simulacion.json (la deja comprobar_pagina.py).
 """
 
 import csv
@@ -34,6 +36,7 @@ ARCHIVOS = (
     "casos.csv",
     "revisiones.csv",
     "flujo.json",
+    "simulacion.json",
 )
 FIGURAS = {
     "comparativa_prueba.png",
@@ -46,6 +49,7 @@ FIGURAS = {
 def main() -> int:
     con_anfitrion = "--con-anfitrion" in sys.argv
     con_casos = "--con-casos" in sys.argv
+    con_simulacion = "--con-simulacion" in sys.argv
     carpetas = sorted(p for p in RESULTADOS.iterdir() if p.is_dir() and p.name != "en_curso")
     if not carpetas:
         print("No hay ninguna carpeta de evidencia")
@@ -130,6 +134,16 @@ def main() -> int:
                 with (carpeta / nombre).open(encoding="utf-8", newline="") as archivo:
                     if not list(csv.DictReader(archivo)):
                         fallos.append(f"{nombre} no trae ninguna fila")
+        if con_simulacion:
+            sim = json.loads((carpeta / "simulacion.json").read_text())
+            comparadas = sum(
+                sum(s["comparacion"]["cualquier_alerta"].values()) for s in sim["sesiones"]
+            )
+            if sim["estado"] != "ok" or not comparadas:
+                fallos.append("simulacion.json no trae una sesion con transacciones comparadas")
+            if sim["reportable"] is not False:
+                fallos.append("simulacion.json debe ir marcada no reportable")
+            print(f"Simulacion: {[(s['sesion'], s['transacciones']) for s in sim['sesiones']]}")
         if con_anfitrion:
             anfitrion = json.loads((carpeta / "anfitrion.json").read_text())
             if "uso_sudo" not in anfitrion:
