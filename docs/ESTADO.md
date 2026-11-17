@@ -3,7 +3,8 @@
 Documento vivo. Cada chat lo lee al empezar y lo actualiza al cerrar.
 
 - **Última actualización:** 2026-11-17 (UTC)
-- **Versión publicada:** v0.1.0
+- **Versión integrada en `main`:** 0.1.0 (Pull Request #1, commit `54c0be4`).
+- **Etiqueta `v0.1.0`:** **pendiente**. El entorno de Claude no tiene permiso para crear etiquetas; la crea Christopher desde GitHub (*Releases > Draft a new release*, etiqueta `v0.1.0` sobre el commit `54c0be4`).
 - **Fase en curso:** ninguna. La fase 1 está terminada; sigue la fase 2.
 - **Punto de prueba pendiente:** **A** (Omarchy 4, cinco minutos). Puede saltarse, pero es barato.
 
@@ -45,6 +46,7 @@ Las que la especificación dejaba «para quien construya»:
 ## Límites del entorno de Claude (comprobados el 2026-11-16)
 
 - Llega a GitHub (repositorio y API REST; no GraphQL) y a PyPI.
+- Puede subir ramas, abrir Pull Requests e integrarlos; **no** puede crear etiquetas ni publicaciones.
 - No llega a Docker Hub, Kaggle ni OpenML desde la consola. La búsqueda y lectura de páginas web sí funcionan.
 - Tiene el cliente de Docker pero no el servicio en marcha: Compose y n8n solo se prueban en N2.
 - La consola trabaja como `root`: las pruebas del guion deben ejecutarse también con un usuario normal (ver `CLAUDE.md`).
