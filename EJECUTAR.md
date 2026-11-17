@@ -2,7 +2,7 @@
 
 Esta guía es para quien ejecuta el sistema en su computador. No hace falta saber programar ni instalar nada: Omarchy 4 ya trae Docker, Docker Compose, Git y el navegador.
 
-**Versión 0.4.0 — punto de prueba B.** Comprueba que el sistema arranca en tu equipo, descarga los datos reales, entrena el modelo de detección de anomalías (Isolation Forest) y calcula las primeras métricas. Toma unos diez minutos, más las descargas de la primera vez (imágenes de Docker y unos 150 MB de datos). Aún no hay página de simulación. Desde la versión 0.4.0, la dirección `http://localhost:8000/salud` también dice si la API cargó el modelo entrenado.
+**Versión 0.6.0 — punto de prueba C: el sistema completo con la página.** Además de lo que comprobaba el punto B (arranque, datos reales, entrenamiento y métricas), ahora usarás la **página de simulación**, que es lo que verá el público del congreso. Toma unos quince minutos de ejecución, más las descargas de la primera vez (imágenes de Docker y unos 150 MB de datos), y unos veinte minutos usando la página.
 
 ## Antes de empezar
 
@@ -39,20 +39,34 @@ cd sistema-hibrido-deteccion-fraude
 
 Si en lugar de eso aparece `ERROR`, **no intentes arreglarlo**: el guion ya guardó lo necesario. Sigue con el paso 4 y devuelve la carpeta tal cual.
 
-## 3. Mirar que responde
+## 3. Usar la página de simulación
 
 ```
 ./fraude estado
 ./fraude abrir
 ```
 
-**Deberías ver:** con `estado`, dos líneas: `api responde en …` y `n8n responde en …`. Con `abrir`, el navegador en `http://localhost:8000`. En esta versión la página aún no existe, así que mostrará un mensaje corto de «no encontrado»; para ver algo, entra en `http://localhost:8000/salud`, que debe mostrar `"estado":"ok"` y, después de entrenar, `"cargado":true` dentro de `"modelo"`.
+**Deberías ver:** con `estado`, dos líneas: `api responde en …` y `n8n responde en …`. Con `abrir`, Chrome con la página **Simulador de verificación de transacciones** en `http://localhost:8000`. Si no se abre sola, escribe esa dirección en el navegador.
 
-Si quieres, haz una captura con `Print Screen`. Se guarda sola en `~/Pictures/Screenshots` y el siguiente paso la recoge.
+Haz lo siguiente, sin prisa, y fíjate en qué entiendes y qué no. Haz una captura con `Print Screen` en los pasos marcados con 📷: se guardan solas en `~/Pictures/Screenshots` y la evidencia las recoge.
+
+1. **Antes de empezar.** Debajo de los botones verás «Listo para empezar» y cuántas transacciones tiene el lote (unas 126: originales con etiqueta, sintéticas de ubicación y algunas entradas inválidas a propósito). 📷
+2. **Iniciar.** Pulsa **Iniciar simulación**. Cada segundo llega una transacción: la boleta muestra el monto, un sello con el nivel (*Sin alerta*, *Revisión recomendada*, *Alerta prioritaria* o *Error de evaluación*) y las razones. Un instante después aparece la **etiqueta real** del conjunto y si coincide. Los contadores, la matriz y las gráficas cambian solos. 📷 a mitad del lote.
+3. **Pausar y revisar.** Pulsa **Pausar**. En la **Bandeja de revisión**, escribe un comentario en dos o tres casos y pulsa **Confirmar sospecha** o **Descartar sospecha**. Debe aparecer «Guardado: caso … revisado» y el caso sale de la bandeja.
+4. **Continuar hasta el final.** Pulsa **Continuar simulación** (puedes subir la velocidad). Al terminar debe decir **Lote completo**. 📷
+5. **Transacción manual.** En **Transacción manual** deja monto `1250`, país habitual `EC` y país `US`, y pulsa **Evaluar transacción**. El sello debe decir **Alerta prioritaria** con dos razones: monto alto, y monto alto con país distinto. Prueba también un monto pequeño o el mismo país.
+6. **Modo presentación.** Pulsa **Modo presentación** (o la tecla `P`): todo se ve más grande, pensado para el proyector. 📷 Vuelve a pulsarlo para salir.
+7. **Tema.** Pulsa **Tema** (o la tecla `T`) para pasar a claro y a oscuro. 📷 en el tema que no sea el tuyo.
+8. **Ventana estrecha.** Pon la ventana en mosaico al lado de la terminal (como hace Hyprland al abrir otra ventana). La página debe verse en una columna, sin cortarse. 📷
+9. **Solo con el teclado.** Recarga la página y, sin tocar el ratón, usa `Tab` para moverte, `Intro` para pulsar y `Espacio` para iniciar o pausar. Pulsa `?` para ver los atajos. Anota si en algún momento no sabías dónde estaba el foco.
+
+Si algo no responde, la página dice qué pasa y qué hacer (por ejemplo, «n8n no responde. La simulación quedó en pausa.»). Anótalo y sigue.
+
+Para la exposición, la página puede abrirse en ventana propia con *Install > Web App* del menú de Omarchy (`Super + Space`), con la dirección `http://localhost:8000`.
 
 ## 4. Anotar y reunir la evidencia
 
-1. Abre `resultados/en_curso/OBSERVACIONES.md` con cualquier editor y escribe con tus palabras qué hiciste, qué viste, cuánto tardó y qué te confundió. El cuestionario del final déjalo en blanco por ahora.
+1. Abre `resultados/en_curso/OBSERVACIONES.md` con cualquier editor y escribe con tus palabras qué hiciste, qué viste, cuánto tardó y qué te confundió. **Esta vez llena también el cuestionario del final** (diez frases, de 1 a 5), pensando en la página.
 2. Ejecuta:
 
 ```
@@ -88,6 +102,10 @@ Si quieres, haz una captura con `Print Screen`. Se guarda sola en `~/Pictures/Sc
 | ¿Qué fraudes se escapan y qué falsas alarmas hay? | `analisis_errores/` (parte de validación) |
 | ¿n8n clasifica igual que Python cada transacción del lote y cuánto tarda? | `flujo.json`: `paridad` y `latencia_ms` |
 | ¿Se registran los casos y quedan pendientes los que deben? | `casos.csv` |
+| ¿Qué envió la página, qué respondió el sistema y cómo se compara con la etiqueta? | `simulacion.json` |
+| ¿Se guardaron las revisiones que hiciste en la página? | `revisiones.csv` |
+| ¿La página se ve bien en tu Chrome, en pantalla completa, en ventana estrecha y en modo presentación? | `capturas/` y `OBSERVACIONES.md` |
+| ¿Es fácil de usar? | Cuestionario SUS en `OBSERVACIONES.md` |
 
 ## Si algo va mal
 
@@ -100,6 +118,8 @@ Si quieres, haz una captura con `Print Screen`. Se guarda sola en `~/Pictures/Sc
 | Un mensaje de que el puerto 8000 o 5678 ya está en uso | Usa otros puertos. Escribe una vez `export FRAUDE_PUERTO_API=8010 FRAUDE_PUERTO_N8N=5690` y, en esa misma terminal, repite `./fraude todo`. Las demás órdenes (`estado`, `abrir`, `evidencia`, `apagar`) deben ejecutarse en esa misma terminal |
 | Se queda mucho tiempo en el paso 1 | La primera descarga depende de tu conexión. Si n8n no responde pasados entre cuatro y siete minutos, el guion lo da por fallido y guarda los registros |
 | `[entrenar] ERROR` o `[evaluar] ERROR` | Casi siempre es consecuencia de un `[preparar] ERROR` anterior: arréglalo primero. Si `preparar` terminó bien, ejecuta `./fraude evidencia` y envía el `.zip`: `modelo.json` y `metricas.json` dicen qué pasó |
+| La página dice «Aún no hay lote de demostración» | El paso `demostrar` no llegó a generarlo. Ejecuta `./fraude todo` otra vez y recarga la página |
+| La página dice «La API no responde» o «n8n no responde» | `./fraude estado`. Si algo está detenido, `./fraude todo` y recarga la página |
 | Cualquier otro `ERROR` | Ejecuta `./fraude evidencia` y envía el `.zip`. Con eso basta para diagnosticarlo |
 
 Ejecutar `./fraude todo` varias veces no rompe nada. Para volver a empezar de cero: `./fraude apagar` y de nuevo `./fraude todo`.
@@ -114,6 +134,5 @@ Para borrar todo al terminar el proyecto: `./fraude apagar`, luego `sudo docker 
 
 ## Más adelante
 
-- **Página de simulación:** llega en la fase 6. Podrás abrirla en ventana propia con *Install > Web App* del menú de Omarchy.
 - **Grabar la pantalla:** `Alt + Print Screen` inicia y detiene la grabación; el video queda en `~/Videos`.
 - **Explicación con LLM local (fase 7, opcional):** pedirá una preparación única de la gráfica para Docker (`nvidia-container-toolkit`). Se documentará aquí cuando esa fase la verifique.

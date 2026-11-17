@@ -37,9 +37,9 @@ jobs:
           uv run pytest -v
 
   punta-a-punta:
-    name: Compose, n8n y flujo ping
+    name: Compose, n8n, flujos y pagina
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -95,10 +95,32 @@ jobs:
       - name: API en marcha (modelo, /evaluar, errores y casos)
         run: python3 tests/punta_a_punta/comprobar_api.py http://127.0.0.1:8000
 
-      - name: La evidencia exporta casos y revisiones
+      # Fase 6: la pagina en un navegador real (Chromium con Playwright): teclado, etiqueta
+      # despues del veredicto y nunca enviada, estados de error, axe-core (WCAG 2.2 A y AA) y
+      # capturas en tres anchos por dos temas, mas el modo presentacion.
+      - name: Playwright y axe-core para la pagina
+        run: |
+          python3 -m venv /tmp/pw
+          /tmp/pw/bin/pip install --quiet playwright==1.63.0
+          /tmp/pw/bin/playwright install --with-deps chromium
+          mkdir -p /tmp/axe && cd /tmp/axe && npm pack --silent axe-core@4.14.1 && tar xzf axe-core-4.14.1.tgz
+
+      - name: Pagina de simulacion (teclado, accesibilidad y capturas)
+        run: /tmp/pw/bin/python tests/punta_a_punta/comprobar_pagina.py http://127.0.0.1:8000 --axe /tmp/axe/package/axe.min.js --salida capturas_ci
+
+      - name: Subir las capturas de la pagina
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-pagina
+          path: capturas_ci/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: La evidencia exporta casos, revisiones y la sesion de la pagina
         run: |
           docker compose run --rm -T tareas evidencia
-          python3 tests/punta_a_punta/comprobar_evidencia.py --con-casos
+          python3 tests/punta_a_punta/comprobar_evidencia.py --con-casos --con-simulacion
 
       - name: Con la API detenida, n8n responde 502 con el caso en error_evaluacion
         run: |

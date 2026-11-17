@@ -6,7 +6,7 @@ name: fraude
 services:
   api:
     build: .
-    image: fraude-local:0.5.0
+    image: fraude-local:0.6.0
     user: "${FRAUDE_UID:-1000}:${FRAUDE_GID:-1000}"
     environment:
       # Que modelo usa la API: auto (el real si existe; si no, el de la muestra), real o
@@ -67,7 +67,7 @@ services:
       start_period: 180s
 
   tareas:
-    image: fraude-local:0.5.0
+    image: fraude-local:0.6.0
     pull_policy: never
     profiles: ["tareas"]
     user: "${FRAUDE_UID:-1000}:${FRAUDE_GID:-1000}"
