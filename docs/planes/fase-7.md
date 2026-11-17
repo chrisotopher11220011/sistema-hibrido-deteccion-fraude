@@ -37,38 +37,38 @@
 
 ### Tarea 1: configuración y módulo `explicacion`
 
-- [ ] Prueba: `config/llm.yaml` existe con servidor, modelo fijado, tiempo límite y comprobación.
-- [ ] Prueba: el mensaje contiene el nivel, las reglas activadas con su razón, la puntuación, los umbrales y las contribuciones; no contiene reglas no activadas ni `variables`.
-- [ ] Prueba: `comprobar` detecta cada tipo de fallo.
-- [ ] Prueba: `redactar` devuelve plantilla con motivo `llm_desactivado`, `nivel_sin_redaccion`, `tiempo_agotado`, `error_llm` o `comprobacion_fallida`, y `llm` con modelo, duración y comprobación válida.
-- [ ] Implementación en `src/fraude/explicacion.py`.
+- [x] Prueba: `config/llm.yaml` existe con servidor, modelo fijado, tiempo límite y comprobación.
+- [x] Prueba: el mensaje contiene el nivel, las reglas activadas con su razón, la puntuación, los umbrales y las contribuciones; no contiene reglas no activadas ni `variables`.
+- [x] Prueba: `comprobar` detecta cada tipo de fallo.
+- [x] Prueba: `redactar` devuelve plantilla con motivo `llm_desactivado`, `nivel_sin_redaccion`, `tiempo_agotado`, `error_llm` o `comprobacion_fallida`, y `llm` con modelo, duración y comprobación válida.
+- [x] Implementación en `src/fraude/explicacion.py`.
 
 ### Tarea 2: ruta `POST /explicacion` y contratos
 
-- [ ] Prueba con un servidor compatible con OpenAI de pruebas (HTTP real, incluido el tiempo límite).
-- [ ] Esquemas `redaccion_pedida` y `redaccion`; `explicacion` de los casos admite `respaldo` y `comprobacion` (ampliación, ADR 0016).
+- [x] Prueba con un servidor compatible con OpenAI de pruebas (HTTP real, incluido el tiempo límite).
+- [x] Esquemas `redaccion_pedida` y `redaccion`; `explicacion` de los casos admite `respaldo` y `comprobacion` (ampliación, ADR 0016).
 
 ### Tarea 3: flujo de n8n
 
-- [ ] Prueba en el simulador: solo las alertas piden redacción; con `llm` el caso guarda el texto del modelo; con plantilla, error de la API o sin respuesta, guarda la plantilla con su respaldo; el nivel no cambia en ninguna de las 45 combinaciones.
-- [ ] Nodos If «¿Pedir redacción?», HTTP «Redactar explicación» (sin reintento, tiempo límite mayor que el de `config/llm.yaml`), If «¿Redacción del modelo?» y Set de cada salida.
+- [x] Prueba en el simulador: solo las alertas piden redacción; con `llm` el caso guarda el texto del modelo; con plantilla, error de la API o sin respuesta, guarda la plantilla con su respaldo; el nivel no cambia en ninguna de las 45 combinaciones.
+- [x] Nodos If «¿Pedir redacción?», HTTP «Redactar explicación» (sin reintento, tiempo límite mayor que el de `config/llm.yaml`), If «¿Redacción del modelo?» y Set de cada salida.
 
 ### Tarea 4: `tareas llm`, `todo --llm` y evidencia
 
-- [ ] `tareas llm`: descarga el modelo con progreso, lo precarga y deja `resultados/en_curso/llm.json` (modelo, resumen, tamaño, memoria de la gráfica usada).
-- [ ] `tareas todo --llm` ejecuta `llm` antes de los demás pasos.
-- [ ] `explicaciones.json`: origen, motivos de respaldo, tiempos (mediana y p95), comprobación repetida sobre cada caso guardado y su tasa de fallos, muestra de textos; `llm.json` en la evidencia; columnas nuevas en `casos.csv`.
+- [x] `tareas llm`: descarga el modelo con progreso, lo precarga y deja `resultados/en_curso/llm.json` (modelo, resumen, tamaño, memoria de la gráfica usada).
+- [x] `tareas todo --llm` ejecuta `llm` antes de los demás pasos.
+- [x] `explicaciones.json`: origen, motivos de respaldo, tiempos (mediana y p95), comprobación repetida sobre cada caso guardado y su tasa de fallos, muestra de textos; `llm.json` en la evidencia; columnas nuevas en `casos.csv`.
 
 ### Tarea 5: Compose y guion
 
-- [ ] Servicio `llm` con perfil `llm`, imagen exacta, volumen `ollama_modelos`, sin puertos, `OLLAMA_KEEP_ALIVE=-1`; `compose.gpu.yaml` con la reserva de la gráfica.
-- [ ] `./fraude todo --llm`: perfil `llm`, `FRAUDE_LLM=activo`, `compose.gpu.yaml` solo si Docker tiene el entorno de NVIDIA y `nvidia-smi` responde; si el arranque con gráfica falla, reintenta con el procesador. Sin `--llm`, `FRAUDE_LLM=desactivado`. `apagar` también detiene `llm`.
-- [ ] `anfitrion.json` anota si se pidió el LLM y con qué se ejecuta.
+- [x] Servicio `llm` con perfil `llm`, imagen exacta, volumen `ollama_modelos`, sin puertos, `OLLAMA_KEEP_ALIVE=-1`; `compose.gpu.yaml` con la reserva de la gráfica.
+- [x] `./fraude todo --llm`: perfil `llm`, `FRAUDE_LLM=activo`, `compose.gpu.yaml` solo si Docker tiene el entorno de NVIDIA y `nvidia-smi` responde; si el arranque con gráfica falla, reintenta con el procesador. Sin `--llm`, `FRAUDE_LLM=desactivado`. `apagar` también detiene `llm`.
+- [x] `anfitrion.json` anota si se pidió el LLM y con qué se ejecuta.
 
 ### Tarea 6: CI (N2)
 
-- [ ] Trabajo nuevo «LLM local»: Ollama real con un modelo diminuto en el procesador (`qwen3.5:0.8b`), lote de la muestra, paridad total y explicaciones con origen `llm`; el trabajo de siempre comprueba el respaldo sin LLM.
+- [x] Trabajo nuevo «LLM local»: Ollama real con un modelo diminuto en el procesador (`qwen3.5:0.8b`), lote de la muestra, paridad total y explicaciones con origen `llm`; el trabajo de siempre comprueba el respaldo sin LLM.
 
 ### Tarea 7: documentos
 
-- [ ] ADR 0016; `docs/spec.md` (secciones 7, 8.5, 8.6, 8.8, 14 y 16); `EJECUTAR.md` con la preparación de la gráfica; supuestos S9 y nuevos; `CHANGELOG.md`; `README.md`; `docs/ESTADO.md`.
+- [x] ADR 0016; `docs/spec.md` (secciones 7, 8.5, 8.6, 8.8, 14 y 16); `EJECUTAR.md` con la preparación de la gráfica; supuestos S9 y nuevos; `CHANGELOG.md`; `README.md`; `docs/ESTADO.md`.

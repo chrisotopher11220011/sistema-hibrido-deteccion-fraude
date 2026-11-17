@@ -2,11 +2,11 @@
 
 Documento vivo. Cada chat lo lee al empezar y lo actualiza al cerrar.
 
-- **Última actualización:** 2026-11-17 (UTC), cierre de la fase 6
-- **Versión integrada en `main`:** 0.3.0. La 0.4.0 está en el Pull Request #7, la 0.5.0 en el #8 y la 0.6.0 en el #9, los tres **abiertos** con la CI en verde y apilados: el #8 apunta a `fase-4-api-casos` y el #9 a `fase-5-flujos-n8n`. Orden: Christopher integra **#7**, luego **#8** y luego **#9**; GitHub reapunta cada uno a `main` al integrar el anterior.
-- **Etiquetas `v0.1.0` a `v0.6.0`:** **pendientes**. El entorno de Claude no puede crear etiquetas; las crea Christopher desde GitHub (*Releases > Draft a new release*): `v0.1.0` sobre el commit `54c0be4`, `v0.2.0` sobre el commit `0a20cd8`, `v0.3.0` sobre el commit `2ff2987`, y `v0.4.0`, `v0.5.0` y `v0.6.0` sobre los commits de integración de los Pull Requests #7, #8 y #9.
-- **Fase en curso:** ninguna. La fase 6 está terminada; sigue la fase 7 (LLM local, opcional) o directamente el punto de prueba C.
-- **Punto de prueba pendiente:** **C** (Omarchy 4): sistema completo con la página. Incluye lo que comprobaban los puntos A y B.
+- **Última actualización:** 2026-11-17 (UTC), cierre de la fase 7
+- **Versión integrada en `main`:** 0.3.0. La 0.4.0 está en el Pull Request #7, la 0.5.0 en el #8, la 0.6.0 en el #9 y la 0.7.0 en el #10, los cuatro **abiertos** con la CI en verde y apilados: el #8 apunta a `fase-4-api-casos`, el #9 a `fase-5-flujos-n8n` y el #10 a `fase-6-pagina-simulacion`. Orden: Christopher integra **#7**, **#8**, **#9** y **#10**; GitHub reapunta cada uno a `main` al integrar el anterior.
+- **Etiquetas `v0.1.0` a `v0.7.0`:** **pendientes**. El entorno de Claude no puede crear etiquetas; las crea Christopher desde GitHub (*Releases > Draft a new release*): `v0.1.0` sobre el commit `54c0be4`, `v0.2.0` sobre el commit `0a20cd8`, `v0.3.0` sobre el commit `2ff2987`, y `v0.4.0` a `v0.7.0` sobre los commits de integración de los Pull Requests #7 a #10.
+- **Fase en curso:** ninguna. La fase 7 está terminada; sigue el punto de prueba C (con y sin LLM) y después la fase 8.
+- **Punto de prueba pendiente:** **C** (Omarchy 4): sistema completo con la página y, como sección 6 de `EJECUTAR.md`, con el LLM local (`./fraude todo --llm`). Incluye lo que comprobaban los puntos A y B.
 
 ## Fases
 
@@ -18,26 +18,27 @@ Documento vivo. Cada chat lo lee al empezar y lo actualiza al cerrar.
 | 4. API y casos | v0.4.0 | Terminada (N1 y N2 con la muestra), pendiente de integrar. Sin punto de prueba propio | #7 (abierto) |
 | 5. Flujos de n8n | v0.5.0 | Terminada: paridad 124/124 en N2 con la muestra. Sin punto de prueba propio | #8 (abierto, sobre #7) |
 | 6. Página de simulación | v0.6.0 | Terminada ([CI](https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/actions/runs/44144074191)): capturas revisadas en N2, axe-core sin violaciones y pruebas en verde con la muestra. Espera el punto C | #9 (abierto, sobre #8) |
-| 7. LLM local (opcional) | v0.7.0 | Sin empezar | |
+| 7. LLM local (opcional) | v0.7.0 | Terminada ([CI](https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/actions/runs/44156246186)): Ollama real en el procesador con un modelo de 0,8B, paridad 124/124 con el LLM activo. Espera el punto C con LLM | #10 (abierto, sobre #9) |
 | 8. Mejora con evidencia | v0.8.x | Sin empezar | |
 | 9. Cierre | v1.0.0 | Sin empezar | |
 
 ## Qué existe hoy
 
-- `api` con `GET /salud` (estado del modelo), `POST /evaluar` (contrato 8.3), `POST /casos`, `GET /casos` y `POST /casos/{id}/revision` (SQLite en `datos/casos/casos.sqlite`). Carga el modelo de `datos/modelo/` o `datos/muestra/modelo/` (`FRAUDE_MODELO`) y lo recarga cuando `entrenar` deja uno nuevo (ADR 0013). Sirve la página en `/` y las rutas `/simulacion/*` (fase 6).
+- `api` con `GET /salud` (estado del modelo), `POST /evaluar` (contrato 8.3), `POST /explicacion` (redacción por el LLM local con comprobación automática, o motivo para usar la plantilla; ADR 0016), `POST /casos`, `GET /casos` y `POST /casos/{id}/revision` (SQLite en `datos/casos/casos.sqlite`). Carga el modelo de `datos/modelo/` o `datos/muestra/modelo/` (`FRAUDE_MODELO`) y lo recarga cuando `entrenar` deja uno nuevo (ADR 0013). Sirve la página en `/` y las rutas `/simulacion/*` (fase 6).
 - Página de simulación en `web/` (HTML, CSS y JavaScript sin compilación, sistema de diseño en `web/DISENO.md`): lote por n8n a través de la API, nivel y razones, etiqueta real después del veredicto, contadores y matriz del lote, gráficas en lienzo, bandeja de revisión, transacción manual, historial, temas, modo presentación y teclado. `src/fraude/simulacion.py`: rutas `/simulacion/*` y registro en `resultados/en_curso/simulacion.jsonl` (ADR 0015).
 - Contratos como esquemas JSON en `docs/contratos/`, con pruebas en `tests/contrato/`.
-- `n8n` 2.47.7 con tres flujos importados y publicados en cada arranque por `n8n/arranque.sh`: `ping` (`GET /webhook/ping`), `evaluacion` (`POST /webhook/transaccion`: validar, `/evaluar` con reintento, «Clasificar nivel», explicación por plantilla, notificación simulada, registrar caso y responder con él) y `revision` (`POST /webhook/revision`). ADR 0014.
+- `n8n` 2.47.7 con tres flujos importados y publicados en cada arranque por `n8n/arranque.sh`: `ping` (`GET /webhook/ping`), `evaluacion` (`POST /webhook/transaccion`: validar, `/evaluar` con reintento, «Clasificar nivel», explicación por plantilla y, en las alertas, redacción por `/explicacion`, notificación simulada, registrar caso y responder con él) y `revision` (`POST /webhook/revision`). ADR 0014.
 - Simulador de flujos para N1 (`tests/n8n/simulador.mjs`, Node.js) y paridad exhaustiva con `decision.clasificar`.
-- `tareas` con `todo`, `evidencia`, `preparar`, `entrenar`, `evaluar` y `demostrar` (todos con `--muestra`). `demostrar` envía el lote (`datos/[muestra/]demostracion/lote.json`) por n8n y por Python y deja `flujo.json` con paridad y latencia.
+- `tareas` con `todo` (y `--llm`), `llm`, `evidencia`, `preparar`, `entrenar`, `evaluar` y `demostrar` (todos con `--muestra`). `llm` descarga y precarga el modelo y deja `llm.json`.
+- LLM local opcional: servicio `llm` (Ollama 0.40.16, perfil `llm`, sin puerto) con `qwen3.5:4b-q4_K_M`; `compose.gpu.yaml` para la gráfica; parámetros en `config/llm.yaml`. `demostrar` envía el lote (`datos/[muestra/]demostracion/lote.json`) por n8n y por Python y deja `flujo.json` con paridad y latencia.
 - `entrenar`: Isolation Forest (100 árboles, 256 muestras por árbol) con la parte de ajuste; umbrales por F1 y F0,5 en validación; artefacto en `datos/modelo/modelo.joblib` con `modelo.json`, y copia en `resultados/en_curso/modelo.json`.
 - `evaluar`: protocolo completo de la sección 15 en `metricas.json`, `comparativa.md`, `figuras/` (cuatro) y `analisis_errores/` (validación).
 - Contribución por variable con SHAP (`src/fraude/contribuciones.py`, ADR 0012) y tabla de decisión en Python (`src/fraude/decision.py`).
 - `preparar`: OpenML 1597 (ARFF con MD5 publicada) o CSV de Kaggle a mano en `datos/crudos/creditcard.csv`; conteos, huella SHA-256 del contenido, partición 56/14/30 en `datos/preparados/particion/`, `eda/` de la parte de ajuste, sintéticos en `datos/sinteticos/ubicacion.json` y `datos.json`. Funciona sin `Time`.
 - Motor de reglas (`src/fraude/reglas.py`) con la forma del contrato 8.3 y forma de la transacción del 8.2 (`src/fraude/transaccion.py`, con tipos estrictos).
-- Evidencia: los archivos «para diagnosticar» de la sección 16, más `datos.json`, `eda/`, `modelo.json`, `metricas.json`, `comparativa.md`, `figuras/`, `analisis_errores/`, `casos.csv`, `revisiones.csv`, `flujo.json`, `simulacion.json`, `OBSERVACIONES.md` y `capturas/`.
-- Guion `./fraude` con `todo [--muestra]`, `evidencia`, `abrir`, `estado`, `apagar` y los pasos sueltos.
-- CI: estilo, pruebas unitarias y de contrato, `shellcheck` y punta a punta con Compose usando `todo --muestra`, más la API en marcha (`tests/punta_a_punta/comprobar_api.py`), la exportación de casos, los flujos de n8n reales sin modelo, con revisión y con la API detenida (`comprobar_flujos.py`), y la paridad total de `demostrar` en `flujo.json`. Desde la fase 6, la página en Chromium con Playwright (`comprobar_pagina.py`): teclado, etiqueta, estados de error, axe-core, fluidez y capturas (artefacto `capturas-pagina` y hoja de contactos en el registro).
+- Evidencia: los archivos «para diagnosticar» de la sección 16, más `datos.json`, `eda/`, `modelo.json`, `metricas.json`, `comparativa.md`, `figuras/`, `analisis_errores/`, `casos.csv`, `revisiones.csv`, `flujo.json`, `simulacion.json`, `explicaciones.json`, `llm.json` (con `--llm`), `OBSERVACIONES.md` y `capturas/`.
+- Guion `./fraude` con `todo [--muestra] [--llm]`, `evidencia`, `abrir`, `estado`, `apagar` y los pasos sueltos.
+- CI: estilo, pruebas unitarias y de contrato, `shellcheck` y punta a punta con Compose usando `todo --muestra`, más la API en marcha (`tests/punta_a_punta/comprobar_api.py`), la exportación de casos, los flujos de n8n reales sin modelo, con revisión y con la API detenida (`comprobar_flujos.py`), y la paridad total de `demostrar` en `flujo.json`. Desde la fase 6, la página en Chromium con Playwright (`comprobar_pagina.py`): teclado, etiqueta, estados de error, axe-core, fluidez y capturas (artefacto `capturas-pagina` y hoja de contactos en el registro). Desde la fase 7, trabajo «LLM local» con Ollama real en el procesador (`comprobar_llm.py`), que imprime la muestra de textos en el registro.
 
 ## Decisiones tomadas al construir (fase 1)
 
@@ -113,11 +114,23 @@ Las que la especificación dejaba «para quien construya»:
 | Página en N1 sin Docker | n8n de pruebas con los flujos reales y el simulador | `tests/punta_a_punta/n8n_de_pruebas.py` |
 | Reenvío a n8n | En un hilo aparte: evita el interbloqueo con las llamadas de n8n a la API | ADR 0015 |
 
-## Límites del entorno de Claude (comprobados el 2026-11-17, fase 6)
+## Decisiones tomadas al construir (fase 7)
+
+| Tema | Decisión | Dónde |
+|---|---|---|
+| Servidor del LLM | Ollama 0.40.16 (`ollama/ollama:0.40.16`), API compatible con OpenAI | ADR 0016, `compose.yaml` |
+| Modelo | `qwen3.5:4b-q4_K_M` (resumen `d8b0f5e9760c`, 3,3 GB), sin pensamiento (`reasoning_effort: none`) | ADR 0016, `config/llm.yaml` |
+| Quién llama al LLM | n8n pide la redacción a `POST /explicacion`; la API llama al LLM y comprueba el texto | ADR 0016 |
+| Comprobación automática | Nivel correcto y ningún otro, ninguna regla no activada ni inventada, variables y cifras solo del mensaje, ninguna afirmación de fraude, sin razonamiento visible, longitud | `src/fraude/explicacion.py`, `config/llm.yaml` |
+| Respaldo | Dos capas (API y n8n) con motivo en `explicacion.respaldo`; tiempo límite 20 s en la API y 30 s en n8n, sin reintento | ADR 0016 |
+| Gráfica | `compose.gpu.yaml` solo si `nvidia-smi` responde y Docker tiene el entorno `nvidia`; reintento en el procesador si falla; estado en `resultados/en_curso/.llm` | ADR 0016, `fraude` |
+| Modelo en la CI | `qwen3.5:0.8b` en el procesador: prueba el camino, no la calidad | `.github/workflows/ci.yml` |
+
+## Límites del entorno de Claude (comprobados el 2026-11-17, fase 7)
 
 - Llega a GitHub (repositorio y API REST; no GraphQL) y a PyPI.
 - Puede subir ramas y abrir Pull Requests (con la API REST: `gh pr create` usa GraphQL y falla). En las fases 4 y 5 no integró: el #8 depende del #7, que integra Christopher. No puede crear etiquetas ni publicaciones.
-- No llega a Docker Hub, Kaggle ni OpenML desde la consola. La lectura de páginas web sí llega a la API de OpenML (metadatos), no a los archivos.
+- No llega a Docker Hub, Kaggle, OpenML ni ollama.com desde la consola. La lectura de páginas web sí llega a la API de etiquetas de Docker Hub, a ollama.com y a la documentación de Ollama, Omarchy y NVIDIA, que sirvió para verificar versiones. La lectura de páginas web sí llega a la API de OpenML (metadatos), no a los archivos.
 - Tiene el cliente de Docker pero no el servicio en marcha: Compose y n8n solo se prueban en N2. n8n 2.47.7 pide Node.js 24 y aquí hay 22; instalar otro Node fue denegado. El simulador de flujos sí corre con Node 22.
 - Llega al código de n8n en GitHub (etiqueta `n8n@2.47.7`), que sirve para verificar el formato de los nodos.
 - La consola trabaja como `root`: las pruebas del guion deben ejecutarse también con un usuario normal (ver `CLAUDE.md`).
@@ -133,10 +146,12 @@ Cada chat lo vuelve a comprobar al empezar.
 - Si quiere Telegram.
 - Si quiere una ejecución completa bajo demanda en GitHub Actions con datos reales.
 
-## Notas para el siguiente chat (fase 7 o mejora tras el punto C)
+## Notas para el siguiente chat (fase 8, mejora tras el punto C)
 
-- Antes de empezar: comprobar si Christopher integró los Pull Requests #7, #8 y #9. Si no, crear la rama siguiente desde `fase-6-pagina-simulacion` y apuntar su Pull Request a esa rama.
-- La explicación del caso llega en `explicacion` (`texto`, `origen`, `modelo`, `duracion_ms`). La página ya muestra «explicación por modelo de lenguaje» cuando `origen` es `llm`: la fase 7 no necesita tocar la página para eso.
+- Antes de empezar: comprobar si Christopher integró los Pull Requests #7 a #10. Si no, crear la rama siguiente desde `fase-7-llm-local` y apuntar su Pull Request a esa rama.
+- Si llega evidencia del punto C con LLM: `llm.json` (¿`ejecucion: grafica`?, `memoria`, resumen), `anfitrion.json` (`llm`), `explicaciones.json` (tasa y tipos de fallo, tiempos, muestra de textos) y lo que anote quien ejecuta sobre los textos. Actualizar S9 y S28 a S32. Ajustes posibles sin cambiar el contrato: el mensaje al LLM, las palabras y expresiones de la comprobación en `config/llm.yaml`, el tiempo límite o el modelo (con ADR).
+- En la CI con 0,8B, la comprobación descartó el 25 % de los textos, sobre todo por no nombrar el nivel de revisión o por frases como «no es fraude confirmado» (negaciones que la comprobación rechaza a propósito). Esas cifras no describen el modelo fijado.
+- La numeración de supuestos tiene S25 y S26 repetidos entre las fases 5 y 6; la fase 7 empezó en S28 para no agravarlo. Conviene renumerar los de la fase 6 en la fase 8.
 - Para ver la página en N1: preparar y entrenar con la muestra en una raíz temporal (`FRAUDE_RAIZ`), generar el lote (`lote.generar`), arrancar `uvicorn fraude.api:app` con `FRAUDE_URL_N8N` apuntando a `n8n_de_pruebas.py`, y ejecutar `comprobar_pagina.py`.
 - Para mirar las capturas de N2: el registro del paso «Hoja de contactos de las capturas» trae tres JPEG en base64 entre `=== HOJA <nombre> INICIO ===` y `FIN`.
 - Si llega evidencia del punto C: `simulacion.json` (sesiones, latencias, comparación), `revisiones.csv`, `capturas/` y el SUS de `OBSERVACIONES.md`. Actualizar S8, S25 a S27 y la tabla SUS de `docs/interfaz-evaluacion.md`. Lo de los puntos A y B sigue en pie: `datos.json`, `modelo.json`, `metricas.json` y `flujo.json` (S3, S5, S12, S15–S17, S19, S20, S23, S24). Las cifras de `comparativa.md` serán las primeras reportables: citarlas siempre con su carpeta de evidencia.
