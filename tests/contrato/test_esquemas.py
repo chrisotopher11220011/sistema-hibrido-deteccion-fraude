@@ -260,7 +260,7 @@ def test_explicacion_del_caso_admite_respaldo_y_comprobacion():
         "comprobacion": {"valida": False, "fallos": ["nivel_no_mencionado"]},
     }
     validar("caso_nuevo", _caso_nuevo(explicacion=plantilla))
-    n8n = {**plantilla, "respaldo": {"motivo": "api_sin_respuesta", "detalle": "ECONNREFUSED"}}
+    n8n = {**plantilla, "respaldo": {"motivo": "error_api", "detalle": "ECONNREFUSED"}}
     validar("caso_nuevo", _caso_nuevo(explicacion=n8n))
     otro = {**plantilla, "respaldo": {**RESPALDO, "motivo": "inventado"}}
     assert not cumple("caso_nuevo", _caso_nuevo(explicacion=otro))

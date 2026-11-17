@@ -640,7 +640,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2420,
+        3300,
         300
       ]
     },
@@ -664,7 +664,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2640,
+        3520,
         200
       ]
     },
@@ -688,7 +688,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2640,
+        3520,
         400
       ]
     },
@@ -700,7 +700,7 @@
               "id": "3dd81ceb-d5cf-5f85-9913-984a6dc9ca30",
               "name": "caso",
               "type": "object",
-              "value": "={{ ((b) => ({ id_transaccion: (b !== null && typeof b === 'object' && typeof b.id_transaccion === 'string' && [...b.id_transaccion].length >= 1 && [...b.id_transaccion].length <= 100) ? b.id_transaccion : null, origen: (b !== null && typeof b === 'object' && ['original', 'sintetico'].includes(b.origen)) ? b.origen : null, monto: (b !== null && typeof b === 'object' && typeof b.monto === 'number' && Number.isFinite(b.monto)) ? b.monto : null, senales: $json.senales, puntuacion: ($json.senales && typeof $json.senales.modelo.puntuacion === 'number') ? $json.senales.modelo.puntuacion : null, nivel: $json.nivel, razones: $json.razones, explicacion: $json.explicacion, notificacion: $json.notificacion, versiones: { reglas: $json.senales ? ($json.senales.versiones || {}).reglas || null : null, modelo: $json.senales ? ($json.senales.versiones || {}).modelo || null : null, flujo: 'transaccion-0.6.0' } }))($('Webhook transacción').first().json.body) }}"
+              "value": "={{ ((b) => ({ id_transaccion: (b !== null && typeof b === 'object' && typeof b.id_transaccion === 'string' && [...b.id_transaccion].length >= 1 && [...b.id_transaccion].length <= 100) ? b.id_transaccion : null, origen: (b !== null && typeof b === 'object' && ['original', 'sintetico'].includes(b.origen)) ? b.origen : null, monto: (b !== null && typeof b === 'object' && typeof b.monto === 'number' && Number.isFinite(b.monto)) ? b.monto : null, senales: $json.senales, puntuacion: ($json.senales && typeof $json.senales.modelo.puntuacion === 'number') ? $json.senales.modelo.puntuacion : null, nivel: $json.nivel, razones: $json.razones, explicacion: $json.explicacion, notificacion: $json.notificacion, versiones: { reglas: $json.senales ? ($json.senales.versiones || {}).reglas || null : null, modelo: $json.senales ? ($json.senales.versiones || {}).modelo || null : null, flujo: 'transaccion-0.7.0' } }))($('Webhook transacción').first().json.body) }}"
             }
           ]
         },
@@ -711,7 +711,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2860,
+        3740,
         300
       ]
     },
@@ -737,7 +737,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3080,
+        3960,
         300
       ],
       "onError": "continueErrorOutput"
@@ -772,7 +772,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        3300,
+        4180,
         200
       ]
     },
@@ -787,7 +787,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        3520,
+        4400,
         100
       ]
     },
@@ -804,8 +804,185 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        3520,
+        4400,
         400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "350b82c2-fdf6-54d0-8e27-629d39c46c1f",
+              "leftValue": "={{ $json.nivel === 'alerta_prioritaria' || $json.nivel === 'revision_recomendada' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e1f6488a-4d4f-524f-a388-ff29393a00f1",
+      "name": "¿Pedir redacción?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/explicacion",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ ((b) => ({ id_transaccion: (b !== null && typeof b === 'object' && typeof b.id_transaccion === 'string' && [...b.id_transaccion].length >= 1 && [...b.id_transaccion].length <= 100) ? b.id_transaccion : null, nivel: $json.nivel, senales: $json.senales }))($('Webhook transacción').first().json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "d5e1e3f2-b604-57a0-a4ce-809217b362be",
+      "name": "Redactar explicación",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        200
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "94e113fa-e80e-5e6e-ae9c-3971a1c6fef8",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body !== null && typeof $json.body === 'object' && $json.body.origen === 'llm' && typeof $json.body.texto === 'string' && $json.body.texto.length > 0 && typeof $json.body.modelo === 'string' && typeof $json.body.duracion_ms === 'number' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b2df249e-6864-5612-813f-ed40ee01db22",
+      "name": "¿Redacción del modelo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2860,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c23b1237-b057-5dd2-bbeb-e885e72ae76e",
+              "name": "nivel",
+              "type": "string",
+              "value": "={{ $('Preparar explicación').first().json.nivel }}"
+            },
+            {
+              "id": "ae766db9-6526-52cf-87aa-104b36531fb3",
+              "name": "razones",
+              "type": "array",
+              "value": "={{ $('Preparar explicación').first().json.razones }}"
+            },
+            {
+              "id": "7d1f4bcc-146e-5be2-9f7a-b7c13c57a7ec",
+              "name": "senales",
+              "type": "object",
+              "value": "={{ $('Preparar explicación').first().json.senales }}"
+            },
+            {
+              "id": "f67383c0-e643-5b10-9f1a-ec80878d11b6",
+              "name": "explicacion",
+              "type": "object",
+              "value": "={{ ((b, comprobacion) => ({ texto: b.texto, origen: 'llm', modelo: b.modelo, duracion_ms: b.duracion_ms, respaldo: null, comprobacion: comprobacion(b.comprobacion) }))($json.body, (c) => (c !== null && typeof c === 'object' && !Array.isArray(c)) ? { valida: c.valida === true, fallos: Array.isArray(c.fallos) ? c.fallos.filter((f) => typeof f === 'string') : [] } : null) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ce93aa02-11d2-53aa-9b8f-65280ec93fcf",
+      "name": "Explicación del modelo",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3080,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f70d0a9-22fd-5fbf-a4fd-0e8634eeaaf9",
+              "name": "nivel",
+              "type": "string",
+              "value": "={{ $('Preparar explicación').first().json.nivel }}"
+            },
+            {
+              "id": "91b0ba62-1c6b-54af-babb-91ec961c36a2",
+              "name": "razones",
+              "type": "array",
+              "value": "={{ $('Preparar explicación').first().json.razones }}"
+            },
+            {
+              "id": "3611045f-6f46-5044-9a8f-c1c40d0822b3",
+              "name": "senales",
+              "type": "object",
+              "value": "={{ $('Preparar explicación').first().json.senales }}"
+            },
+            {
+              "id": "3cd94e67-f4af-575b-ab3c-ac64d3392dcd",
+              "name": "explicacion",
+              "type": "object",
+              "value": "={{ ((p, j, comprobacion) => { const b = j.body; const r = (b !== null && typeof b === 'object') ? b.respaldo : null; const valida = j.error === undefined && j.statusCode === 200 && b !== null && typeof b === 'object' && b.origen === 'plantilla' && r !== null && typeof r === 'object' && ['llm_desactivado', 'nivel_sin_redaccion', 'tiempo_agotado', 'error_llm', 'comprobacion_fallida'].includes(r.motivo); const respaldo = valida ? { motivo: r.motivo, detalle: typeof r.detalle === 'string' ? r.detalle : '', modelo: typeof r.modelo === 'string' ? r.modelo : null, duracion_ms: (typeof r.duracion_ms === 'number' && isFinite(r.duracion_ms) && r.duracion_ms >= 0) ? r.duracion_ms : null, texto_descartado: typeof r.texto_descartado === 'string' ? r.texto_descartado : null } : { motivo: 'error_api', detalle: j.error !== undefined ? 'Sin respuesta de /explicacion: ' + (typeof j.error === 'string' ? j.error : ((j.error || {}).message || 'sin detalle')) : '/explicacion respondió ' + String(j.statusCode) + ' sin una redacción válida', modelo: null, duracion_ms: null, texto_descartado: null }; return { texto: p.texto, origen: 'plantilla', modelo: null, duracion_ms: null, respaldo: respaldo, comprobacion: valida ? comprobacion(b.comprobacion) : null }; })($('Preparar explicación').first().json.explicacion, $json, (c) => (c !== null && typeof c === 'object' && !Array.isArray(c)) ? { valida: c.valida === true, fallos: Array.isArray(c.fallos) ? c.fallos.filter((f) => typeof f === 'string') : [] } : null) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cfa47edf-af9a-513e-8138-ffa046de1616",
+      "name": "Explicación por plantilla",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3080,
+        300
       ]
     }
   ],
@@ -1032,7 +1209,7 @@
       "main": [
         [
           {
-            "node": "¿Hay alerta?",
+            "node": "¿Pedir redacción?",
             "type": "main",
             "index": 0
           }
@@ -1120,6 +1297,82 @@
         [
           {
             "node": "Responder: caso sin registrar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Pedir redacción?": {
+      "main": [
+        [
+          {
+            "node": "Redactar explicación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Hay alerta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redactar explicación": {
+      "main": [
+        [
+          {
+            "node": "¿Redacción del modelo?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicación por plantilla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Redacción del modelo?": {
+      "main": [
+        [
+          {
+            "node": "Explicación del modelo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicación por plantilla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Explicación del modelo": {
+      "main": [
+        [
+          {
+            "node": "¿Hay alerta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Explicación por plantilla": {
+      "main": [
+        [
+          {
+            "node": "¿Hay alerta?",
             "type": "main",
             "index": 0
           }

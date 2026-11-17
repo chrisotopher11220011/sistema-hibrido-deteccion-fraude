@@ -125,6 +125,14 @@ def sin_modelo(exigir) -> None:
     if codigo == 200:
         exigir(caso["notificacion"]["estado"] == "simulada_enviada", "sin notificacion simulada")
         exigir("señala" in caso["explicacion"]["texto"], "la explicacion no señala para revision")
+        # Fase 7: la alerta paso por «Redactar explicacion». Sin --llm, la API responde que
+        # el LLM no esta activo y n8n conserva su plantilla con ese motivo (ADR 0016).
+        respaldo = caso["explicacion"].get("respaldo") or {}
+        exigir(
+            caso["explicacion"]["origen"] == "plantilla"
+            and respaldo.get("motivo") == "llm_desactivado",
+            f"explicacion sin el respaldo esperado: {caso['explicacion']}",
+        )
     habitual = {**inusual, "id_transaccion": "ci-sint-2", "monto": 20.0}
     habitual["ubicacion"] = {"pais_habitual": "EC", "pais_transaccion": "EC"}
     codigo, caso, _ = transaccion(habitual)

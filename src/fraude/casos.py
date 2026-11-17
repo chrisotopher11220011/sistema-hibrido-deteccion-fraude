@@ -71,7 +71,7 @@ MOTIVOS_RESPALDO = (
     "tiempo_agotado",
     "error_llm",
     "comprobacion_fallida",
-    "api_sin_respuesta",
+    "error_api",
 )
 Duracion = Annotated[Numero, Field(ge=0)]
 

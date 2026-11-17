@@ -132,7 +132,7 @@
             "tiempo_agotado",
             "error_llm",
             "comprobacion_fallida",
-            "api_sin_respuesta"
+            "error_api"
           ]
         },
         "detalle": {
