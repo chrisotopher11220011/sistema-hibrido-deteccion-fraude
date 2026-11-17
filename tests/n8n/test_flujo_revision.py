@@ -7,7 +7,7 @@ Devuelve el codigo y el cuerpo de la API; un `id_caso` con otra forma no llega a
 import json
 
 import pytest
-from simulacion import FLUJOS, simular
+from simulacion import FLUJOS, simular, validar_contrato
 
 FLUJO = json.loads((FLUJOS / "revision.json").read_text(encoding="utf-8"))
 NODOS = {n["name"]: n for n in FLUJO["nodes"]}
@@ -83,6 +83,7 @@ def test_id_caso_invalido_responde_422_sin_llamar_a_la_api(cuerpo):
     resultado = _ejecutar(cuerpo)
     assert resultado["peticiones"] == []
     assert resultado["respuesta"]["codigo"] == 422
+    validar_contrato("error", resultado["respuesta"]["cuerpo"])
     error = resultado["respuesta"]["cuerpo"]["error"]
     assert error["tipo"] == "entrada_invalida" and "id_caso" in error["mensaje"]
 
@@ -91,6 +92,7 @@ def test_api_caida_responde_502():
     resultado = _ejecutar(REVISION, [{"error": {"message": "connect ECONNREFUSED"}}])
     assert len(resultado["peticiones"]) == 1  # sin reintento: no duplicar la revision
     assert resultado["respuesta"]["codigo"] == 502
+    validar_contrato("error_flujo", resultado["respuesta"]["cuerpo"])
     error = resultado["respuesta"]["cuerpo"]["error"]
     assert error["tipo"] == "revision_no_registrada" and "ECONNREFUSED" in error["mensaje"]
 

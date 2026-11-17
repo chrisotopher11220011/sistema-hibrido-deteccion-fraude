@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:error_flujo",
+  "title": "Respuesta 502 de los webhooks de n8n",
+  "description": "ADR 0014. El flujo calculó lo que pudo pero la API no guardó el resultado. En /webhook/transaccion el caso calculado viaja en `caso` (sin id_caso: no se registró) y queda en el historial de n8n. En /webhook/revision la decisión no se guardó. Los demás errores de los webhooks repiten el código y el cuerpo de la API (esquema `error`).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "id_transaccion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tipo",
+        "mensaje",
+        "detalles"
+      ],
+      "properties": {
+        "tipo": {
+          "enum": [
+            "caso_no_registrado",
+            "revision_no_registrada"
+          ]
+        },
+        "mensaje": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detalles": {
+          "type": "array"
+        }
+      }
+    },
+    "caso": {
+      "$ref": "urn:fraude:contratos:caso_nuevo"
+    }
+  },
+  "if": {
+    "properties": {
+      "error": {
+        "properties": {
+          "tipo": {
+            "const": "caso_no_registrado"
+          }
+        }
+      }
+    }
+  },
+  "then": {
+    "required": [
+      "caso"
+    ]
+  }
+}

@@ -355,6 +355,7 @@ def test_registro_rechazado_responde_502_con_el_caso():
     )
     respuesta = resultado["respuesta"]
     assert respuesta["codigo"] == 502
+    validar_contrato("error_flujo", respuesta["cuerpo"])
     assert respuesta["cuerpo"]["error"]["tipo"] == "caso_no_registrado"
     assert respuesta["cuerpo"]["caso"]["nivel"] == "revision_recomendada"
     assert "422" in respuesta["cuerpo"]["error"]["mensaje"]
@@ -367,6 +368,7 @@ def test_api_caida_responde_502_con_el_caso_en_error_evaluacion():
     assert len([p for p in resultado["peticiones"] if p["nodo"] == REGISTRAR]) == 1
     respuesta = resultado["respuesta"]
     assert respuesta["codigo"] == 502
+    validar_contrato("error_flujo", respuesta["cuerpo"])
     assert respuesta["cuerpo"]["caso"]["nivel"] == "error_evaluacion"
     assert "ECONNREFUSED" in respuesta["cuerpo"]["error"]["mensaje"]
     assert resultado["fallo_flujo"] is None
