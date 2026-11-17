@@ -9,6 +9,7 @@ los revisa, una sola vez.
 """
 
 import json
+import os
 import secrets
 import sqlite3
 from contextlib import closing
@@ -53,6 +54,12 @@ CREATE TABLE IF NOT EXISTS casos (
     versiones TEXT NOT NULL
 )
 """
+
+
+def ruta_bd_casos(raiz: Path) -> Path:
+    """`FRAUDE_BD_CASOS` o `datos/casos/casos.sqlite` bajo la raiz."""
+    propia = os.environ.get("FRAUDE_BD_CASOS")
+    return Path(propia) if propia else Path(raiz) / "datos" / "casos" / "casos.sqlite"
 
 
 class CasoNoEncontrado(Exception):

@@ -266,3 +266,81 @@ def test_evaluacion_fallida_queda_en_el_resumen(tmp_path):
     (en_curso / "metricas.json").write_text(json.dumps(fallo))
     resumen = (reunir(tmp_path) / "RESUMEN.md").read_text()
     assert "Repite el paso entrenar." in resumen
+
+
+# --- Casos y revisiones (fase 4) ------------------------------------------------------
+
+
+def _registrar_casos(raiz):
+    from fraude.registro import RegistroCasos
+
+    registro = RegistroCasos(raiz / "datos" / "casos" / "casos.sqlite")
+    base = {
+        "id_transaccion": "s-1",
+        "origen": "sintetico",
+        "monto": 1250.0,
+        "senales": {
+            "id_transaccion": "s-1",
+            "reglas": [
+                {"id": "MONTO_ALTO", "evaluable": True, "activada": True,
+                 "alto_riesgo": False, "razon": "El monto supera el umbral"},
+                {"id": "MONTO_ALTO_UBICACION_INUSUAL", "evaluable": True, "activada": False,
+                 "alto_riesgo": True, "razon": "No se activa"},
+            ],
+            "modelo": {"evaluable": False, "puntuacion": None, "umbral_revision": None,
+                       "umbral_prioritaria": None, "anomalia": False, "anomalia_alta": False},
+            "versiones": {"reglas": "0.2.0", "modelo": None},
+        },
+        "puntuacion": None,
+        "razones": ["El monto supera el umbral"],
+        "explicacion": {"texto": "Señalada para revisión.", "origen": "plantilla"},
+        "notificacion": {"canal": "simulada", "estado": "registrada"},
+        "versiones": {"reglas": "0.2.0", "modelo": None, "flujo": "f-1"},
+    }  # fmt: skip
+    pendiente = registro.crear({**base, "nivel": "revision_recomendada"})
+    registro.crear({**base, "nivel": "sin_alerta", "razones": []})
+    revisado = registro.crear({**base, "nivel": "alerta_prioritaria"})
+    registro.revisar(
+        revisado["id_caso"],
+        {"decision": "sospecha_confirmada", "revisor": "ana", "comentario": "TOKEN=abc123"},
+    )
+    return pendiente, revisado
+
+
+def _leer_csv(ruta):
+    import csv
+
+    with ruta.open(encoding="utf-8", newline="") as archivo:
+        return list(csv.DictReader(archivo))
+
+
+def test_exporta_casos_y_revisiones(tmp_path):
+    pendiente, revisado = _registrar_casos(tmp_path)
+
+    carpeta = reunir(tmp_path)
+
+    casos = _leer_csv(carpeta / "casos.csv")
+    revisiones = _leer_csv(carpeta / "revisiones.csv")
+    assert [c["id_caso"] for c in casos][0] == pendiente["id_caso"]
+    assert len(casos) == 3
+    assert list(casos[0]) == list(evidencia.COLUMNAS_CASOS)
+    assert casos[0]["reglas_activadas"] == "MONTO_ALTO"
+    assert casos[0]["estado"] == "pendiente_revision"
+    assert len(revisiones) == 1
+    assert list(revisiones[0]) == list(evidencia.COLUMNAS_REVISIONES)
+    assert revisiones[0]["id_caso"] == revisado["id_caso"]
+    assert revisiones[0]["decision_final"] == "sospecha_confirmada"
+    assert revisiones[0]["revisor"] == "ana"
+    assert "abc123" not in revisiones[0]["comentario"]
+    resumen = (carpeta / "RESUMEN.md").read_text()
+    assert "3 casos" in resumen and "1 revisado" in resumen
+
+
+def test_sin_base_de_casos_lo_anota_y_no_la_crea(tmp_path):
+    carpeta = reunir(tmp_path)
+
+    assert _leer_csv(carpeta / "casos.csv") == []
+    assert (carpeta / "casos.csv").read_text().startswith("id_caso,")
+    assert (carpeta / "revisiones.csv").read_text().startswith("id_caso,")
+    assert not (tmp_path / "datos" / "casos" / "casos.sqlite").exists()
+    assert "Sin casos registrados" in (carpeta / "RESUMEN.md").read_text()

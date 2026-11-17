@@ -19,7 +19,7 @@ from fraude.casos import CasoNuevo, Revision
 from fraude.configuracion import cargar
 from fraude.errores import ErrorApi, detalles_validacion, id_del_cuerpo, respuesta_error
 from fraude.evaluacion import ModeloNoDisponible, evaluar_transaccion
-from fraude.registro import CasoNoEncontrado, CasoYaRevisado, RegistroCasos
+from fraude.registro import CasoNoEncontrado, CasoYaRevisado, RegistroCasos, ruta_bd_casos
 from fraude.servicio_modelo import ServicioModelo
 from fraude.transaccion import Transaccion
 
@@ -34,12 +34,6 @@ def fecha_utc(momento: datetime | None = None) -> str:
 
 def _raiz_por_defecto() -> Path:
     return Path(os.environ.get("FRAUDE_RAIZ", "/trabajo"))
-
-
-def ruta_bd_casos(raiz: Path) -> Path:
-    """`FRAUDE_BD_CASOS` o `datos/casos/casos.sqlite` bajo la raiz."""
-    propia = os.environ.get("FRAUDE_BD_CASOS")
-    return Path(propia) if propia else Path(raiz) / "datos" / "casos" / "casos.sqlite"
 
 
 def crear_app(raiz: Path | None = None, modo_modelo: str | None = None) -> FastAPI:
