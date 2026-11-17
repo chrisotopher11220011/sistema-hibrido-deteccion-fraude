@@ -14,6 +14,10 @@ CODIGOS = {
     "caso_no_encontrado": 404,
     "caso_ya_revisado": 409,
     "ruta_no_disponible": 404,
+    # Pagina de simulacion (ADR 0015).
+    "lote_no_disponible": 404,
+    "etiqueta_en_transaccion": 422,
+    "n8n_no_disponible": 502,
 }
 
 

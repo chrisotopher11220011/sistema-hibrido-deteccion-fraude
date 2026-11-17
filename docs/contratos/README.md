@@ -13,6 +13,7 @@ Esquemas JSON (borrador 2020-12) de la sección 8 de `docs/spec.md`. Son el acue
 | `error.schema.json` | Cuerpo de toda respuesta que no es 2xx | ADR 0013 |
 | `salud.schema.json` | Respuesta de `GET /salud` | Sección 8.6 |
 | `error_flujo.schema.json` | Respuesta 502 de los webhooks de n8n cuando la API no guardó el resultado | Sección 8.7; ADR 0014 |
+| `lote.schema.json` | Respuesta de `GET /simulacion/lote`: lote de demostración con la etiqueta aparte de la transacción | Sección 8.6; ADR 0014 y 0015 |
 
 Cada esquema tiene un `$id` de la forma `urn:fraude:contratos:<nombre>`; `caso` y `caso_nuevo` usan `evaluacion` por referencia.
 

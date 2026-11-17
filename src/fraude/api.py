@@ -16,7 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
-from fraude import __version__
+from fraude import __version__, simulacion
 from fraude.casos import CasoNuevo, Revision
 from fraude.configuracion import cargar
 from fraude.errores import (
@@ -44,8 +44,17 @@ def _raiz_por_defecto() -> Path:
     return Path(os.environ.get("FRAUDE_RAIZ", "/trabajo"))
 
 
-def crear_app(raiz: Path | None = None, modo_modelo: str | None = None) -> FastAPI:
-    """API sobre `raiz`. `modo_modelo`: `auto`, `real` o `muestra` (`FRAUDE_MODELO`)."""
+def crear_app(
+    raiz: Path | None = None,
+    modo_modelo: str | None = None,
+    url_n8n: str | None = None,
+    pedir_n8n=None,
+) -> FastAPI:
+    """API sobre `raiz`. `modo_modelo`: `auto`, `real` o `muestra` (`FRAUDE_MODELO`).
+
+    `url_n8n` (`FRAUDE_URL_N8N`) y `pedir_n8n` son para las rutas de la pagina; `pedir_n8n`
+    sustituye la peticion HTTP en las pruebas.
+    """
     raiz = Path(raiz) if raiz is not None else _raiz_por_defecto()
     servicio = ServicioModelo(raiz, modo_modelo or os.environ.get("FRAUDE_MODELO", "auto"))
     registro = RegistroCasos(ruta_bd_casos(raiz))
@@ -138,6 +147,7 @@ def crear_app(raiz: Path | None = None, modo_modelo: str | None = None) -> FastA
             mensaje = f"El caso no esta pendiente de revision ({error}); no se cambia."
             raise ErrorApi("caso_ya_revisado", mensaje) from error
 
+    simulacion.montar(app, raiz, servicio, url_n8n=url_n8n, pedir=pedir_n8n)
     return app
 
 

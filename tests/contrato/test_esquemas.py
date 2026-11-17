@@ -17,6 +17,7 @@ ESPERADOS = {
     "revision",
     "salud",
     "error_flujo",
+    "lote",
 }
 NIVELES = yaml.safe_load((RAIZ / "config" / "decision.yaml").read_text())["niveles"]
 
