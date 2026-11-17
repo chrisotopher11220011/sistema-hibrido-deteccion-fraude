@@ -108,6 +108,8 @@ def test_diez_semillas_con_media_y_desviacion(evaluado):
     f1 = semillas["resumen"]["hibrido_cualquier"]["f1"]
     assert {"media", "desviacion", "minimo", "maximo", "n"} <= set(f1)
     assert "umbral_revision" in semillas["resumen"]
+    for metrica in ("precision_media", "precision_k", "auc_roc"):
+        assert {"media", "desviacion"} <= set(semillas["resumen"][metrica]), metrica
 
 
 def test_particion_temporal_presente_con_time(evaluado):

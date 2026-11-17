@@ -246,7 +246,7 @@ def estabilidad(datos: dict, config: dict, config_reglas: dict) -> dict:
             "semilla": int(semilla),
             "umbral_revision": umbrales["umbral_revision"],
             "umbral_prioritaria": umbrales["umbral_prioritaria"],
-            "precision_media": metricas.de_puntuacion(datos["y"], puntuacion, k)["precision_media"],
+            **metricas.de_puntuacion(datos["y"], puntuacion, k),
         }
         for n in ("solo_modelo", "hibrido_cualquier", "hibrido_prioritaria"):
             b = metricas.binarias(datos["y"], alertas[n])
@@ -254,7 +254,7 @@ def estabilidad(datos: dict, config: dict, config_reglas: dict) -> dict:
         por_semilla.append(fila)
     resumen = {
         clave: _resumen([f[clave] for f in por_semilla])
-        for clave in ("umbral_revision", "umbral_prioritaria", "precision_media")
+        for clave in ("umbral_revision", "umbral_prioritaria", *METRICAS_PUNTUACION)
     }
     for n in ("solo_modelo", "hibrido_cualquier", "hibrido_prioritaria"):
         resumen[n] = {
@@ -262,6 +262,7 @@ def estabilidad(datos: dict, config: dict, config_reglas: dict) -> dict:
         }
     return {
         "nota": "Solo reglas no depende de la semilla. Desviacion estandar muestral (n - 1).",
+        "k": k,
         "por_semilla": por_semilla,
         "resumen": resumen,
     }

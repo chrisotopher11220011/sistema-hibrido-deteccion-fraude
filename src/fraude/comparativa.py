@@ -118,6 +118,8 @@ def _tabla_semillas(semillas: dict) -> list[str]:
     lineas += [
         "",
         f"- Precisión media del modelo: {_resumen_semilla(resumen['precision_media'])}",
+        f"- Precisión en los {semillas['k']} primeros: {_resumen_semilla(resumen['precision_k'])}",
+        f"- AUC ROC, complementaria: {_resumen_semilla(resumen['auc_roc'])}",
         f"- `umbral_revision`: {_resumen_semilla(resumen['umbral_revision'], 4)}",
         f"- `umbral_prioritaria`: {_resumen_semilla(resumen['umbral_prioritaria'], 4)}",
     ]
