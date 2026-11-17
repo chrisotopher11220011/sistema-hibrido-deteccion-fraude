@@ -158,6 +158,7 @@
         <input type="text" id="revisor" maxlength="100" autocomplete="name" value="Revisor de la demostración"></label>
       <p class="bandeja__vacia" id="bandeja-vacia">No hay casos pendientes de revisión.</p>
       <ul class="bandeja__lista" id="bandeja-lista"></ul>
+      <p class="nota" id="bandeja-nota-total"></p>
       <p class="revisar__resultado" id="bandeja-resultado" role="status"></p>
     </section>
 
@@ -167,7 +168,7 @@
       <form id="form-manual" novalidate>
         <label class="campo" for="manual-monto"><span class="campo__etiqueta">Monto</span>
           <input type="text" inputmode="decimal" id="manual-monto" required aria-describedby="manual-monto-ayuda manual-error" autocomplete="off" value="1250">
-          <span class="campo__ayuda" id="manual-monto-ayuda">Número mayor o igual a 0, por ejemplo 1250 o 1250,50.</span></label>
+          <span class="campo__ayuda" id="manual-monto-ayuda">Número mayor o igual a 0, por ejemplo 1250, 1.250 o 1250,50.</span></label>
         <label class="campo" for="manual-habitual"><span class="campo__etiqueta">País habitual</span>
           <select id="manual-habitual"></select></label>
         <label class="campo" for="manual-pais"><span class="campo__etiqueta">País de la transacción</span>

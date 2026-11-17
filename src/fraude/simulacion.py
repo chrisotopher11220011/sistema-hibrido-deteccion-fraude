@@ -70,7 +70,7 @@ def _sesion(valor: str | None) -> str | None:
 
 
 def _numero(valor: str | None) -> int | None:
-    if valor is None or not valor.isdigit() or len(valor) > 9:
+    if valor is None or not (valor.isascii() and valor.isdigit()) or len(valor) > 9:
         return None
     return int(valor)
 
@@ -95,6 +95,14 @@ def elegir_lote(raiz: Path, servicio) -> Path | None:
         if archivo.is_file():
             return archivo
     return None
+
+
+def fuente_lote(raiz: Path, servicio) -> str | None:
+    """`real` o `muestra`: de que lote salen las transacciones que envia la pagina."""
+    archivo = elegir_lote(raiz, servicio)
+    if archivo is None:
+        return None
+    return "muestra" if archivo.parent.parent.name == "muestra" else "real"
 
 
 def montar(
@@ -135,6 +143,7 @@ def montar(
             "sesion": sesion,
             "n": numero,
             "ruta": ruta,
+            "lote": fuente_lote(raiz, servicio),
             "enviado": None,
             "codigo": None,
             "respuesta": None,
@@ -196,7 +205,16 @@ def _pedir_n8n(pedir: Callable, url: str, cuerpo, id_t: str | None) -> tuple[int
     except Exception as error:  # noqa: BLE001 - red, tiempo limite o n8n detenido
         detalle = [{"motivo": f"{type(error).__name__}: {error}"}]
         return 502, cuerpo_error("n8n_no_disponible", mensaje, detalle, id_t)
-    if not isinstance(salida, dict):
+    # n8n responde 200 con el caso, 502 con el caso calculado, o el codigo y el cuerpo de error
+    # de la API (revision). Cualquier otra cosa (500 «Error in workflow», 404 de un webhook sin
+    # publicar, texto) es que el flujo no funciono.
+    con_caso = isinstance(salida, dict) and isinstance(salida.get("caso"), dict)
+    error_api = (
+        isinstance(salida, dict)
+        and isinstance(salida.get("error"), dict)
+        and isinstance(salida["error"].get("tipo"), str)
+    )
+    if not isinstance(salida, dict) or (not 200 <= codigo < 300 and not con_caso and not error_api):
         detalle = [{"codigo_n8n": codigo, "cuerpo": str(salida)[:500]}]
         return 502, cuerpo_error("n8n_no_disponible", mensaje, detalle, id_t)
     return codigo, salida

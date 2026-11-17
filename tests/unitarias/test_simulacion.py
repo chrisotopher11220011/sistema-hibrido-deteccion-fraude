@@ -347,3 +347,40 @@ def test_el_reenvio_no_bloquea_la_api(raiz_api):
     finally:
         servidor.should_exit = True
         hilo.join(timeout=5)
+
+
+# --- Revision de codigo de la fase 6 ---------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("codigo", "cuerpo"),
+    [(500, {"message": "Error in workflow"}), (404, {"code": 404, "message": "not registered"})],
+)
+def test_respuesta_de_n8n_sin_caso_ni_error_del_contrato_es_n8n_no_disponible(
+    raiz_api, codigo, cuerpo
+):
+    n8n = N8nFalso([(codigo, cuerpo)])
+
+    respuesta = _cliente(raiz_api, n8n).post("/simulacion/transacciones", json=TRANSACCION)
+
+    assert respuesta.status_code == 502
+    assert respuesta.json()["error"]["tipo"] == "n8n_no_disponible"
+    assert respuesta.json()["error"]["detalles"][0]["codigo_n8n"] == codigo
+
+
+def test_numero_con_digitos_unicode_no_rompe_el_registro(raiz_api):
+    n8n = N8nFalso([(200, CASO)])
+
+    respuesta = _cliente(raiz_api, n8n).post("/simulacion/transacciones?n=²", json=TRANSACCION)
+
+    assert respuesta.status_code == 200
+    assert _registro(raiz_api)[0]["n"] is None
+
+
+def test_el_registro_anota_de_que_lote_sale(raiz_api):
+    _lote(raiz_api, muestra=True, fuente="muestra")
+    n8n = N8nFalso([(200, CASO)])
+
+    _cliente(raiz_api, n8n).post("/simulacion/transacciones", json=TRANSACCION)
+
+    assert _registro(raiz_api)[0]["lote"] == "muestra"

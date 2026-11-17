@@ -477,3 +477,30 @@ def test_sin_sesiones_de_la_pagina_lo_anota(tmp_path):
     sim = json.loads((carpeta / "simulacion.json").read_text())
     assert sim["estado"] == "sin_sesiones"
     assert "pagina" in (carpeta / "RESUMEN.md").read_text()
+
+
+def test_simulacion_une_la_etiqueta_con_el_lote_que_se_uso(tmp_path):
+    intercambio = _intercambio(1, "t-1", "alerta_prioritaria", lote="muestra")
+    _dejar_simulacion(tmp_path, [intercambio], [_elemento("t-1", 0)])
+    real = tmp_path / "datos" / "demostracion" / "lote.json"
+    real.parent.mkdir(parents=True)
+    real.write_text(json.dumps({"fuente": "real", "elementos": [_elemento("t-1", 1)]}))
+
+    sim = json.loads((reunir(tmp_path) / "simulacion.json").read_text())
+
+    assert sim["intercambios"][0]["etiqueta_real"] == 0
+    assert sim["sesiones"][0]["comparacion"]["cualquier_alerta"]["fp"] == 1
+
+
+def test_simulacion_no_cuenta_los_intentos_sin_respuesta_del_flujo(tmp_path):
+    caido = _intercambio(1, "t-1", None, codigo=502)
+    caido["respuesta"] = {"error": {"tipo": "n8n_no_disponible"}}
+    reintento = _intercambio(2, "t-1", "alerta_prioritaria")
+    _dejar_simulacion(tmp_path, [caido, reintento], [_elemento("t-1", 1)])
+
+    sesion = json.loads((reunir(tmp_path) / "simulacion.json").read_text())["sesiones"][0]
+
+    assert sesion["transacciones"] == 1
+    assert sesion["sin_respuesta_del_flujo"] == 1
+    assert sesion["comparacion"]["sin_veredicto"] == 0
+    assert sesion["comparacion"]["cualquier_alerta"]["vp"] == 1

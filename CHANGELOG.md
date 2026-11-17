@@ -21,6 +21,7 @@ Fase 6, página de simulación. Lo comprobado en la CI usa la muestra para prueb
 - n8n de pruebas para N1 (`tests/punta_a_punta/n8n_de_pruebas.py`): ejecuta los flujos reales con el simulador de la fase 5 contra una API en marcha.
 - `docs/interfaz-evaluacion.md`: revisión frente a las pautas de Amershi et al. (2019), accesibilidad y plan del SUS.
 - `EJECUTAR.md` para el punto de prueba C.
+- Revisión de código con subagente de contexto limpio: ocho hallazgos (ninguno grave), todos corregidos, con prueba los de código: monto manual «1.500» leído como 1,5; respuestas de n8n sin caso (500, 404) que la página saltaba sin reintentar y la API reenviaba sin el cuerpo de error; último caso no registrado que dejaba la página sin salida; etiqueta unida al lote equivocado si existen los dos; intentos sin respuesta contados en `simulacion.json`; `?n=²` con error 500; total de pendientes con más de 50; formulario del caso activo tras revisarlo desde la bandeja.
 
 ### Corregido
 

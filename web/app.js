@@ -6,6 +6,8 @@
 //   solo viaja `elemento.transaccion` (función `enviarTransaccion`).
 // - El sistema «señala para revisión»: nunca afirma que hubo fraude.
 
+import { leerMonto } from './formato.js';
+
 const NIVELES = {
   alerta_prioritaria: { nombre: 'Alerta prioritaria', corto: 'Prioritaria', marca: '--n-prio' },
   revision_recomendada: { nombre: 'Revisión recomendada', corto: 'Recomendada', marca: '--n-rec' },
@@ -44,6 +46,7 @@ const estado = {
   atajos: leerPreferencia('fraude.atajos', '1') === '1',
   seleccion: null, // índice del punto seleccionado en la gráfica
   casoActual: null,
+  pendientes: null,
 };
 
 // --- Utilidades --------------------------------------------------------------------------
@@ -294,7 +297,7 @@ function mostrarEstadoError() { $('estado').dataset.tipo = 'error'; }
 function terminarLote() {
   estado.corriendo = false;
   clearTimeout(estado.temporizador);
-  const pendientes = $('bandeja-lista').children.length;
+  const pendientes = estado.pendientes ?? $('bandeja-lista').children.length;
   mostrarEstado('fin', 'Lote completo.',
     `Se enviaron ${entero.format(estado.cursor)} transacciones. ${pendientes ? `Quedan ${entero.format(pendientes)} casos en la bandeja de revisión.` : 'No quedan casos pendientes.'} Pulsa Reiniciar para volver a empezar.`);
   actualizarMando();
@@ -317,24 +320,17 @@ function procesarRespuesta(respuesta, contexto) {
   }
   if (codigo === 502 && datos && datos.caso && datos.caso.nivel) {
     registrar(datos.caso, contexto, 'n8n calculó el caso, pero la API no pudo guardarlo: no aparecerá en la bandeja.');
-    pausar('El caso no se pudo registrar. La simulación quedó en pausa.',
-      'n8n respondió, pero la API no guardó el caso. Comprueba ./fraude estado y pulsa Continuar simulación.');
+    const ultima = estado.lote && estado.cursor >= estado.lote.elementos.length;
+    pausar('El caso no se pudo registrar. La simulación quedó en pausa.', ultima
+      ? 'n8n respondió, pero la API no guardó el caso. Era la última transacción del lote: comprueba ./fraude estado y pulsa Reiniciar para volver a empezar.'
+      : 'n8n respondió, pero la API no guardó el caso. Comprueba ./fraude estado y pulsa Continuar simulación.');
     mostrarEstadoError();
     return false;
   }
-  if (codigo === 502) {
-    estado.cursor -= 1;
-    pausar('n8n no responde. La simulación quedó en pausa.',
-      `${mensajeError(respuesta)} Después pulsa Continuar simulación.`);
-    mostrarEstadoError();
-    return false;
-  }
-  if (codigo === 422 && datos && datos.error && datos.error.tipo === 'etiqueta_en_transaccion') {
-    pausar('La transacción traía la etiqueta real y no se envió.', mensajeError(respuesta));
-    mostrarEstadoError();
-    return false;
-  }
-  pausar('Respuesta inesperada. La simulación quedó en pausa.', mensajeError(respuesta));
+  // Cualquier otra respuesta: la transacción no se evaluó y se reintentará al continuar.
+  estado.cursor -= 1;
+  const titulo = codigo === 502 ? 'n8n no responde. La simulación quedó en pausa.' : `La API respondió con un error (código ${codigo}). La simulación quedó en pausa.`;
+  pausar(titulo, `${mensajeError(respuesta)} Comprueba los servicios con ./fraude estado y después pulsa Continuar simulación; la transacción se volverá a enviar.`);
   mostrarEstadoError();
   return false;
 }
@@ -543,7 +539,7 @@ function pintarRevisionActual(registro) {
   form.hidden = !pendiente;
   $('caso-comentario').value = '';
   $('caso-revision-resultado').textContent = '';
-  for (const b of form.querySelectorAll('button')) b.disabled = false;
+  for (const control of form.querySelectorAll('button, input')) control.disabled = false;
 }
 
 async function revisar(idCaso, decision, comentario, salida, botones) {
@@ -567,7 +563,8 @@ async function revisar(idCaso, decision, comentario, salida, botones) {
     salida.textContent = `Guardado: caso ${idCaso} revisado, ${texto}, por ${revisor}. Sale de la bandeja y quedará en revisiones.csv al reunir la evidencia.`;
     if (estado.casoActual && estado.casoActual.caso.id_caso === idCaso) {
       estado.casoActual.caso.estado = 'revisado';
-      $('caso-estado').textContent = `Caso revisado: ${texto}.`;
+      $('caso-estado').textContent = `Caso revisado: ${texto}, por ${revisor}.`;
+      for (const control of $('caso-revisar').querySelectorAll('button, input')) control.disabled = true;
     }
     await refrescarBandeja();
     return true;
@@ -597,6 +594,9 @@ async function refrescarBandeja() {
   for (const caso of casos) nuevos.push(actuales.get(caso.id_caso) ?? itemBandeja(caso));
   lista.replaceChildren(...nuevos);
   $('bandeja-vacia').hidden = casos.length > 0;
+  estado.pendientes = Number.isInteger(respuesta.datos.total) ? respuesta.datos.total : casos.length;
+  $('bandeja-nota-total').textContent = estado.pendientes > casos.length
+    ? `Se muestran los ${casos.length} más recientes de ${entero.format(estado.pendientes)} pendientes.` : '';
   if (enFoco && !casos.some((c) => c.id_caso === enFoco)) {
     (lista.querySelector('button') ?? $('revisor')).focus();
   }
@@ -866,10 +866,8 @@ async function enviarManual(evento) {
   evento.preventDefault();
   const campo = $('manual-monto');
   const error = $('manual-error');
-  const texto = campo.value.trim().replace(/\s/g, '');
-  const normal = /,\d{1,2}$/.test(texto) ? texto.replace(/\./g, '').replace(',', '.') : texto.replace(/,/g, '');
-  const monto = Number(normal);
-  if (!texto || !Number.isFinite(monto) || monto < 0) {
+  const monto = leerMonto(campo.value);
+  if (!Number.isFinite(monto) || monto < 0) {
     campo.setAttribute('aria-invalid', 'true');
     error.textContent = 'Escribe un monto válido: un número mayor o igual a 0.';
     campo.focus();

@@ -299,7 +299,12 @@ def prueba_errores(c: Comprobacion, navegador, base: str) -> None:
     pagina.wait_for_function("() => document.getElementById('estado').dataset.tipo === 'error'")
     texto = pagina.inner_text("#estado")
     pausada = not pagina.evaluate("() => window.__simulacion.estado.corriendo")
-    c.anotar("si n8n no responde, la simulacion se pausa y dice que hacer", pausada, texto)
+    sin_avanzar = pagina.evaluate("() => window.__simulacion.estado.cursor") == 0
+    c.anotar(
+        "si n8n no responde, la simulacion se pausa, dice que hacer y no se salta la transaccion",
+        pausada and sin_avanzar,
+        texto,
+    )
     c.capturar(pagina, "estado-error-n8n_claro", completa=False)
     contexto.close()
 

@@ -416,16 +416,27 @@ def _enmascarar_valores(valor):
     return valor
 
 
-def _etiquetas_del_lote(raiz: Path) -> dict[str, int | None]:
-    """`id_transaccion` -> etiqueta real, de los lotes de demostracion (real y muestra)."""
-    etiquetas: dict[str, int | None] = {}
-    for parte in ("muestra", ""):
+def _etiquetas_del_lote(raiz: Path) -> dict[str, dict[str, int | None]]:
+    """Por lote (`real`, `muestra`): `id_transaccion` -> etiqueta real."""
+    etiquetas: dict[str, dict[str, int | None]] = {}
+    for fuente, parte in (("muestra", "muestra"), ("real", "")):
+        mapa: dict[str, int | None] = {}
         datos = _leer(Path(raiz) / "datos" / parte / "demostracion" / "lote.json")
         for elemento in (datos or {}).get("elementos", []):
             transaccion = elemento.get("transaccion")
             if isinstance(transaccion, dict) and isinstance(transaccion.get("id_transaccion"), str):
-                etiquetas[transaccion["id_transaccion"]] = elemento.get("etiqueta_real")
+                mapa[transaccion["id_transaccion"]] = elemento.get("etiqueta_real")
+        etiquetas[fuente] = mapa
     return etiquetas
+
+
+def _nivel_de(intercambio: dict) -> str | None:
+    respuesta = intercambio.get("respuesta")
+    if not isinstance(respuesta, dict):
+        return None
+    caso = respuesta.get("caso") if isinstance(respuesta.get("caso"), dict) else respuesta
+    nivel = caso.get("nivel")
+    return nivel if isinstance(nivel, str) else None
 
 
 def _matriz() -> dict:
@@ -433,7 +444,9 @@ def _matriz() -> dict:
 
 
 def _resumir_sesion(nombre: str | None, intercambios: list[dict]) -> dict:
-    transacciones = [i for i in intercambios if i.get("ruta") == "transacciones"]
+    enviadas = [i for i in intercambios if i.get("ruta") == "transacciones"]
+    # Solo cuentan las que el flujo evaluo: un intento sin respuesta se reintenta despues.
+    transacciones = [i for i in enviadas if _nivel_de(i)]
     comparacion = {
         "cualquier_alerta": _matriz(),
         "solo_prioritaria": _matriz(),
@@ -442,10 +455,8 @@ def _resumir_sesion(nombre: str | None, intercambios: list[dict]) -> dict:
     }
     niveles: dict[str, int] = {}
     for i in transacciones:
-        respuesta = i.get("respuesta") if isinstance(i.get("respuesta"), dict) else {}
-        nivel = respuesta.get("nivel") or (respuesta.get("caso") or {}).get("nivel")
-        if nivel:
-            niveles[nivel] = niveles.get(nivel, 0) + 1
+        nivel = _nivel_de(i)
+        niveles[nivel] = niveles.get(nivel, 0) + 1
         etiqueta = i.get("etiqueta_real")
         if etiqueta not in (0, 1):
             comparacion["sin_etiqueta"] += 1
@@ -470,6 +481,7 @@ def _resumir_sesion(nombre: str | None, intercambios: list[dict]) -> dict:
         "inicio": min(fechas) if fechas else None,
         "fin": max(fechas) if fechas else None,
         "transacciones": len(transacciones),
+        "sin_respuesta_del_flujo": len(enviadas) - len(transacciones),
         "revisiones": sum(1 for i in intercambios if i.get("ruta") == "revisiones"),
         "niveles": niveles,
         "codigos": codigos,
@@ -520,7 +532,11 @@ def _exportar_simulacion(raiz: Path, en_curso: Path, carpeta: Path) -> list[str]
         enviado = i.get("enviado")
         id_t = enviado.get("id_transaccion") if isinstance(enviado, dict) else None
         if i.get("ruta") == "transacciones":
-            i["etiqueta_real"] = etiquetas.get(id_t) if isinstance(id_t, str) else None
+            fuentes = [i["lote"]] if i.get("lote") in etiquetas else ["muestra", "real"]
+            i["etiqueta_real"] = None
+            for fuente in fuentes:
+                if isinstance(id_t, str) and id_t in etiquetas[fuente]:
+                    i["etiqueta_real"] = etiquetas[fuente][id_t]
     grupos: dict[str | None, list[dict]] = {}
     for i in intercambios:
         grupos.setdefault(i.get("sesion"), []).append(i)

@@ -72,3 +72,55 @@ def test_tokens_de_los_temas_y_movimiento_reducido():
     assert ":root[data-presentacion]" in css
     assert "prefers-reduced-motion: reduce" in css
     assert ":focus-visible" in css
+
+
+def _node():
+    import os
+    import shutil
+
+    node = shutil.which("node")
+    if node is None:
+        if os.environ.get("FRAUDE_EXIGIR_NODE") == "1":
+            pytest.fail("Hace falta Node.js (FRAUDE_EXIGIR_NODE=1)")
+        pytest.skip("Sin Node.js")
+    return node
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("1250", 1250.0),
+        ("1.500", 1500.0),  # punto de miles, como muestra la pagina
+        ("1.250,50", 1250.5),
+        ("1250,5", 1250.5),
+        ("12.5", 12.5),
+        ("1,250.50", 1250.5),
+        ("1.250.000", 1250000.0),
+        (" 2 500 ", 2500.0),
+        ("0", 0.0),
+        ("", None),
+        ("-5", None),
+        ("abc", None),
+        ("1,2,3", None),
+        ("1.2.3", None),
+        ("1500,", None),
+        ("12.34,5", None),
+    ],
+)
+def test_lectura_del_monto_manual(texto, esperado):
+    import json
+    import subprocess
+
+    codigo = (
+        "import { leerMonto } from './web/formato.js';"
+        f"const v = leerMonto({json.dumps(texto)});"
+        "process.stdout.write(JSON.stringify(Number.isNaN(v) ? null : v));"
+    )
+    salida = subprocess.run(
+        [_node(), "--input-type=module", "-e", codigo],
+        cwd=WEB.parent,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert json.loads(salida) == esperado
