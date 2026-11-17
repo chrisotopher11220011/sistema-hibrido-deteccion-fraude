@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas:
+    name: Pruebas unitarias y estilo
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar uv
+        run: pipx install uv==0.11.32
+      - name: Instalar dependencias bloqueadas
+        run: uv sync --frozen
+      - name: Estilo (ruff)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Guiones de shell (shellcheck)
+        run: shellcheck fraude n8n/arranque.sh
+      - name: Pruebas unitarias
+        run: uv run pytest -v
+
+  punta-a-punta:
+    name: Compose, n8n y flujo ping
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Variables de la ejecucion
+        run: |
+          {
+            echo "FRAUDE_UID=$(id -u)"
+            echo "FRAUDE_GID=$(id -g)"
+            echo "FRAUDE_COMMIT=${GITHUB_SHA::7}"
+            echo "FRAUDE_ETIQUETA=ci"
+          } >> "$GITHUB_ENV"
+          docker version --format 'Docker {{.Server.Version}}'
+          docker compose version
+
+      - name: Construir y arrancar con Compose
+        run: docker compose up -d --build --wait --wait-timeout 420
+
+      - name: La API responde desde el anfitrion
+        run: curl -fsS --retry 5 --retry-connrefused http://127.0.0.1:8000/salud | tee salud.json && grep -q '"estado":"ok"' salud.json
+
+      - name: n8n responde al ping desde el anfitrion
+        run: curl -fsS --retry 5 --retry-connrefused http://127.0.0.1:5678/webhook/ping | tee ping.json && grep -q '"estado"' ping.json && grep -q 'ok' ping.json
+
+      - name: Version de n8n en marcha
+        run: |
+          version="$(docker compose exec -T n8n n8n --version | tail -n 1)"
+          echo "n8n $version"
+          grep -q "n8nio/n8n:${version}\$" <(grep 'image: n8nio' compose.yaml)
+
+      - name: Los puertos solo escuchan en 127.0.0.1
+        run: |
+          docker ps --format '{{.Names}} {{.Ports}}'
+          if docker ps --format '{{.Ports}}' | grep -E '0\.0\.0\.0|\[::\]'; then
+            echo "Hay puertos publicados fuera de 127.0.0.1"; exit 1
+          fi
+
+      - name: tareas todo (Compose directo)
+        run: docker compose run --rm -T tareas todo
+
+      - name: Evidencia del camino directo
+        run: python3 tests/punta_a_punta/comprobar_evidencia.py
+
+      - name: Apagar
+        run: docker compose down
+
+      - name: ./fraude todo (segundo arranque, con el volumen de n8n ya creado)
+        run: ./fraude todo
+
+      - name: ./fraude estado
+        run: ./fraude estado | tee estado.txt && grep -q 'api responde' estado.txt && grep -q 'n8n responde' estado.txt
+
+      - name: Evidencia del guion
+        run: python3 tests/punta_a_punta/comprobar_evidencia.py --con-anfitrion
+
+      - name: sudo ./fraude evidencia no deja archivos de root
+        run: |
+          sudo ./fraude evidencia
+          python3 tests/punta_a_punta/comprobar_evidencia.py --con-anfitrion
+
+      - name: ./fraude apagar
+        run: |
+          ./fraude apagar
+          test -z "$(docker compose ps -q)"
+
+      - name: Registros si algo fallo
+        if: failure()
+        run: |
+          docker compose ps --all || true
+          docker compose logs --no-color --tail 300 || true
+
+      - name: Subir la evidencia
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencia-ci
+          path: resultados/
+          if-no-files-found: warn
+          retention-days: 14

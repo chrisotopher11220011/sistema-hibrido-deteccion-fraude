@@ -222,9 +222,8 @@ def _resumen(
         lineas.append("- No se comprobaron.")
     lineas += ["", "## Pasos", ""]
     for p in pasos:
-        lineas.append(
-            f"- {p['paso']}: {estado.get(p['estado'], p['estado'])}. {p.get('detalle', '')}".rstrip()
-        )
+        marca = estado.get(p["estado"], p["estado"])
+        lineas.append(f"- {p['paso']}: {marca}. {p.get('detalle', '')}".rstrip())
     if not pasos:
         lineas.append("- No se ejecuto ningun paso; solo se reunio la evidencia.")
     lineas += ["", "## Notas", ""]

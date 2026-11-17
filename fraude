@@ -1,0 +1,400 @@
+#!/usr/bin/env bash
+# Guion para quien ejecuta el prototipo. Pensado para Omarchy 4.
+# Obligaciones: docs/spec.md, seccion 17. Decisiones: docs/decisions/0010.
+#
+# Uso: ./fraude <comando>     (./fraude ayuda muestra la lista)
+
+set -u -o pipefail
+
+RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$RAIZ" || exit 1
+
+EN_CURSO="$RAIZ/resultados/en_curso"
+MARCA_SESION="$EN_CURSO/.inicio_sesion"
+PUERTO_API="${FRAUDE_PUERTO_API:-8000}"
+PUERTO_N8N="${FRAUDE_PUERTO_N8N:-5678}"
+URL_PAGINA="http://localhost:${PUERTO_API}"
+SERVICIOS=(api n8n)
+
+MODO_DOCKER=""   # directo | sudo | root
+UID_USUARIO="$(id -u)"
+GID_USUARIO="$(id -g)"
+CASA_USUARIO="${HOME:-}"
+if [ "$UID_USUARIO" -eq 0 ] && [ -n "${SUDO_UID:-}" ]; then
+    # Alguien lanzo `sudo ./fraude`: los archivos deben quedar a nombre de esa persona.
+    UID_USUARIO="$SUDO_UID"
+    GID_USUARIO="${SUDO_GID:-$SUDO_UID}"
+    if command -v getent >/dev/null 2>&1; then
+        CASA_USUARIO="$(getent passwd "$SUDO_UID" | cut -d: -f6)"
+    fi
+fi
+
+decir() { printf '[fraude] %s\n' "$*"; }
+avisar() { printf '[fraude] AVISO: %s\n' "$*" >&2; }
+fallar() { printf '[fraude] ERROR: %s\n' "$*" >&2; }
+
+ayuda() {
+    cat <<FIN
+Prototipo academico de deteccion hibrida de fraude.
+
+Uso: ./fraude <comando>
+
+  todo        Arranca los servicios, ejecuta todos los pasos y reune la evidencia.
+  evidencia   Reune de nuevo la evidencia (registros, capturas y observaciones).
+  abrir       Abre la pagina en el navegador (${URL_PAGINA}).
+  estado      Dice que servicios estan en marcha y si responden.
+  apagar      Detiene todos los servicios.
+
+  preparar | entrenar | evaluar | demostrar
+              Pasos sueltos. Se activan en fases posteriores del proyecto.
+
+Lo habitual: ./fraude todo, usar la pagina, ./fraude evidencia y ./fraude apagar.
+La guia paso a paso esta en EJECUTAR.md.
+FIN
+}
+
+# --- Docker -----------------------------------------------------------------
+
+detectar_docker() {
+    [ -n "$MODO_DOCKER" ] && return 0
+    if ! command -v docker >/dev/null 2>&1; then
+        fallar "No encuentro Docker. Omarchy 4 lo trae instalado; si lo quitaste, vuelve a instalarlo."
+        return 1
+    fi
+    if [ "$(id -u)" -eq 0 ]; then
+        MODO_DOCKER="root"
+        avisar "Estas ejecutando el guion entero como administrador. No hace falta: basta ./fraude, que pide sudo solo para Docker."
+    elif docker info >/dev/null 2>&1; then
+        MODO_DOCKER="directo"
+    else
+        if ! command -v sudo >/dev/null 2>&1; then
+            fallar "Docker no responde a tu usuario y no encuentro sudo."
+            return 1
+        fi
+        decir "Docker pide permisos de administrador (es lo normal en Omarchy 4)."
+        decir "Voy a usar sudo solo para Docker; puede pedirte tu contrasena."
+        if ! sudo -v; then
+            fallar "No pude obtener permisos con sudo."
+            return 1
+        fi
+        if ! sudo docker info >/dev/null 2>&1; then
+            fallar "Docker no responde ni con sudo. Puede que el servicio este detenido."
+            fallar "Prueba: sudo systemctl start docker   y vuelve a ejecutar ./fraude."
+            return 1
+        fi
+        MODO_DOCKER="sudo"
+    fi
+    return 0
+}
+
+docker_() {
+    if [ "$MODO_DOCKER" = "sudo" ]; then sudo docker "$@"; else docker "$@"; fi
+}
+
+# safe.directory: permite leer el commit tambien cuando se lanza con `sudo ./fraude`.
+git_() { git -c safe.directory="$RAIZ" "$@" 2>/dev/null; }
+commit_actual() { git_ rev-parse --short HEAD || echo "sin-commit"; }
+etiqueta_actual() { git_ describe --tags --always || echo "sin-etiqueta"; }
+
+# Compose recibe el usuario real para que los contenedores escriban a su nombre.
+compose() {
+    local entorno=(
+        "FRAUDE_UID=$UID_USUARIO"
+        "FRAUDE_GID=$GID_USUARIO"
+        "FRAUDE_PUERTO_API=$PUERTO_API"
+        "FRAUDE_PUERTO_N8N=$PUERTO_N8N"
+        "FRAUDE_COMMIT=$(commit_actual)"
+        "FRAUDE_ETIQUETA=$(etiqueta_actual)"
+    )
+    if [ "$MODO_DOCKER" = "sudo" ]; then
+        sudo env "${entorno[@]}" docker compose "$@"
+    else
+        env "${entorno[@]}" docker compose "$@"
+    fi
+}
+
+tareas() {
+    local opciones=(--rm)
+    [ -t 1 ] || opciones+=(-T)
+    compose run "${opciones[@]}" "$@"
+}
+
+# --- Archivos ---------------------------------------------------------------
+
+preparar_carpetas() {
+    mkdir -p "$RAIZ/datos" "$EN_CURSO/registros" "$EN_CURSO/capturas"
+    [ -f "$MARCA_SESION" ] || touch "$MARCA_SESION"
+}
+
+nueva_sesion() {
+    rm -rf "$EN_CURSO/registros" "$EN_CURSO/capturas" "$EN_CURSO/pasos.json"
+    if [ -f "$EN_CURSO/OBSERVACIONES.md" ]; then
+        mkdir -p "$EN_CURSO/anteriores"
+        mv "$EN_CURSO/OBSERVACIONES.md" "$EN_CURSO/anteriores/OBSERVACIONES-$(date -u +%Y%m%dT%H%M%SZ).md"
+    fi
+    mkdir -p "$EN_CURSO/registros" "$EN_CURSO/capturas"
+    touch "$MARCA_SESION"
+}
+
+# Si el guion corrio como administrador, devuelve los archivos a la persona.
+devolver_propiedad() {
+    if [ "$(id -u)" -eq 0 ] && [ "$UID_USUARIO" -ne 0 ]; then
+        chown -R "$UID_USUARIO:$GID_USUARIO" "$RAIZ/resultados" "$RAIZ/datos" 2>/dev/null || true
+    fi
+}
+trap devolver_propiedad EXIT
+
+json_cadena() {
+    local texto="$1"
+    texto="${texto//\\/\\\\}"
+    texto="${texto//\"/\\\"}"
+    texto="${texto//$'\n'/\\n}"
+    texto="${texto//$'\t'/ }"
+    texto="${texto//$'\r'/}"
+    printf '"%s"' "$texto"
+}
+
+primera_linea() { "$@" 2>/dev/null | head -n 1; }
+
+recoger_anfitrion() {
+    local omarchy="" origen_omarchy="no detectado" sistema="" nucleo docker_motor compose_version
+    local grafica="" origen_grafica="no detectada" nvidia_en_docker="false" cortafuegos memoria_mb=""
+    local procesador="" nucleos="" disco_libre_gb="" uso_sudo="false" puertos=""
+
+    if command -v omarchy-version >/dev/null 2>&1; then
+        omarchy="$(primera_linea omarchy-version)"; origen_omarchy="omarchy-version"
+    elif [ -n "${OMARCHY_PATH:-}" ] && [ -f "$OMARCHY_PATH/version" ]; then
+        omarchy="$(head -n 1 "$OMARCHY_PATH/version")"; origen_omarchy="\$OMARCHY_PATH/version"
+    elif [ -f "$CASA_USUARIO/.local/share/omarchy/version" ]; then
+        omarchy="$(head -n 1 "$CASA_USUARIO/.local/share/omarchy/version")"
+        origen_omarchy="carpeta personal: .local/share/omarchy/version"
+    fi
+    if [ -r /etc/os-release ]; then
+        # shellcheck source=/dev/null
+        sistema="$(. /etc/os-release && printf '%s' "${PRETTY_NAME:-${NAME:-}}")"
+    fi
+    nucleo="$(uname -r 2>/dev/null)"
+    docker_motor="$(docker_ version --format '{{.Server.Version}}' 2>/dev/null | head -n 1)"
+    compose_version="$(docker_ compose version --short 2>/dev/null | head -n 1)"
+    if docker_ info --format '{{json .Runtimes}}' 2>/dev/null | grep -q nvidia; then
+        nvidia_en_docker="true"
+    fi
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        grafica="$(primera_linea nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader)"
+        origen_grafica="nvidia-smi"
+    elif command -v lspci >/dev/null 2>&1; then
+        grafica="$(lspci 2>/dev/null | grep -iE 'vga|3d|display' | head -n 3)"
+        origen_grafica="lspci"
+    fi
+    if [ "$MODO_DOCKER" = "sudo" ] && command -v ufw >/dev/null 2>&1; then
+        cortafuegos="$(sudo -n ufw status 2>/dev/null | head -n 1)"
+    elif [ "$MODO_DOCKER" = "root" ] && command -v ufw >/dev/null 2>&1; then
+        cortafuegos="$(primera_linea ufw status)"
+    else
+        cortafuegos="no consultado (hace falta sudo)"
+    fi
+    if [ -r /proc/meminfo ]; then
+        memoria_mb="$(awk '/^MemTotal:/ {print int($2/1024)}' /proc/meminfo)"
+    fi
+    if [ -r /proc/cpuinfo ]; then
+        procesador="$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ *//')"
+    fi
+    nucleos="$(nproc 2>/dev/null)"
+    disco_libre_gb="$(df -Pk "$RAIZ" 2>/dev/null | awk 'NR==2 {print int($4/1048576)}')"
+    if command -v ss >/dev/null 2>&1; then
+        puertos="$(ss -ltnH 2>/dev/null | awk '{print $4}' | grep -E ":(${PUERTO_API}|${PUERTO_N8N})\$" | tr '\n' ' ')"
+    fi
+    [ "$MODO_DOCKER" = "sudo" ] && uso_sudo="true"
+
+    cat > "$EN_CURSO/anfitrion.json" <<FIN
+{
+  "fecha": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "omarchy": {"version": $(json_cadena "${omarchy:-desconocida}"), "obtenida_de": $(json_cadena "$origen_omarchy")},
+  "sistema": $(json_cadena "$sistema"),
+  "nucleo": $(json_cadena "$nucleo"),
+  "docker": {"motor": $(json_cadena "$docker_motor"), "compose": $(json_cadena "$compose_version"), "runtime_nvidia": $nvidia_en_docker},
+  "modo_docker": $(json_cadena "$MODO_DOCKER"),
+  "uso_sudo": $uso_sudo,
+  "usuario": {"uid": $UID_USUARIO, "gid": $GID_USUARIO},
+  "grafica": {"descripcion": $(json_cadena "$grafica"), "obtenida_de": $(json_cadena "$origen_grafica")},
+  "cortafuegos": $(json_cadena "$cortafuegos"),
+  "procesador": $(json_cadena "$procesador"),
+  "nucleos": ${nucleos:-null},
+  "memoria_mb": ${memoria_mb:-null},
+  "disco_libre_gb": ${disco_libre_gb:-null},
+  "puertos": {"api": $PUERTO_API, "n8n": $PUERTO_N8N, "en_escucha": $(json_cadena "$puertos")}
+}
+FIN
+}
+
+guardar_registros() {
+    local servicio
+    mkdir -p "$EN_CURSO/registros"
+    for servicio in "${SERVICIOS[@]}"; do
+        compose logs --no-color --tail 400 "$servicio" > "$EN_CURSO/registros/$servicio.log" 2>&1 || true
+    done
+    compose ps --all > "$EN_CURSO/registros/servicios.txt" 2>&1 || true
+    decir "Registros de los servicios guardados en resultados/en_curso/registros/."
+}
+
+copiar_capturas() {
+    local carpeta="${OMASNAP_SCREENSHOT_DIR:-$CASA_USUARIO/Pictures/Screenshots}" cuantas
+    mkdir -p "$EN_CURSO/capturas"
+    if [ ! -d "$carpeta" ]; then
+        decir "No hay carpeta de capturas ($carpeta); sigo sin capturas."
+        return 0
+    fi
+    find "$carpeta" -maxdepth 1 -type f -newer "$MARCA_SESION" \
+        \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) \
+        -exec cp -p {} "$EN_CURSO/capturas/" \; 2>/dev/null || true
+    cuantas="$(find "$EN_CURSO/capturas" -type f | wc -l | tr -d ' ')"
+    decir "Capturas de esta sesion copiadas: $cuantas (desde $carpeta)."
+}
+
+ultima_evidencia() {
+    find "$RAIZ/resultados" -mindepth 1 -maxdepth 1 -type d ! -name en_curso -printf '%f\n' 2>/dev/null \
+        | sort | tail -n 1
+}
+
+# --- Comandos ---------------------------------------------------------------
+
+reunir_evidencia() {
+    local codigo=0 carpeta
+    decir "Reuniendo la evidencia..."
+    guardar_registros
+    copiar_capturas
+    recoger_anfitrion
+    # --no-deps: la evidencia debe salir aunque un servicio este caido.
+    tareas --no-deps tareas evidencia || codigo=$?
+    carpeta="$(ultima_evidencia)"
+    if [ -n "$carpeta" ]; then
+        decir "Evidencia lista: resultados/$carpeta/ y resultados/$carpeta.zip"
+        decir "Eso es lo que hay que devolver (la carpeta o el .zip)."
+    else
+        fallar "No se creo la carpeta de evidencia. Envia lo que haya en resultados/en_curso/."
+        [ "$codigo" -eq 0 ] && codigo=1
+    fi
+    return "$codigo"
+}
+
+cmd_todo() {
+    local codigo=0 argumento
+    for argumento in "$@"; do
+        if [ "$argumento" = "--llm" ]; then
+            avisar "La explicacion con LLM local llega en la fase 7; por ahora --llm no cambia nada."
+        else
+            fallar "No conozco la opcion: $argumento"
+            return 2
+        fi
+    done
+    detectar_docker || return 1
+    preparar_carpetas
+    nueva_sesion
+    recoger_anfitrion
+
+    decir "Paso 1 de 3: construir y arrancar los servicios (api y n8n)."
+    decir "La primera vez descarga imagenes y puede tardar varios minutos."
+    if compose up -d --build --wait --wait-timeout 420; then
+        decir "Servicios en marcha: la API y n8n responden."
+        decir "Paso 2 de 3: ejecutar los pasos del proyecto."
+        tareas tareas todo --sin-evidencia || codigo=$?
+    else
+        codigo=1
+        fallar "Los servicios no arrancaron bien. Guardo los registros para diagnosticarlo."
+    fi
+
+    decir "Paso 3 de 3: evidencia."
+    reunir_evidencia || codigo=$?
+
+    if [ "$codigo" -eq 0 ]; then
+        decir "Todo termino bien."
+        decir "Siguiente: ./fraude abrir   (los servicios siguen en marcha)."
+        decir "Anota lo que veas en resultados/en_curso/OBSERVACIONES.md y luego ./fraude evidencia."
+        decir "Para detener todo: ./fraude apagar"
+    else
+        fallar "Algo fallo (codigo $codigo). No hace falta que lo arregles:"
+        fallar "devuelve la carpeta de evidencia tal cual; ahi estan los registros."
+    fi
+    return "$codigo"
+}
+
+cmd_evidencia() {
+    detectar_docker || return 1
+    preparar_carpetas
+    reunir_evidencia
+}
+
+cmd_paso() {
+    detectar_docker || return 1
+    preparar_carpetas
+    tareas tareas "$@"
+}
+
+responde() {
+    command -v curl >/dev/null 2>&1 || return 2
+    curl -fsS -m 5 -o /dev/null "$1" 2>/dev/null
+}
+
+cmd_estado() {
+    local nombre url
+    detectar_docker || return 1
+    compose ps --all
+    if ! command -v curl >/dev/null 2>&1; then
+        decir "No encuentro curl; no puedo comprobar si responden."
+        return 0
+    fi
+    for nombre in api n8n; do
+        if [ "$nombre" = "api" ]; then
+            url="http://127.0.0.1:${PUERTO_API}/salud"
+        else
+            url="http://127.0.0.1:${PUERTO_N8N}/webhook/ping"
+        fi
+        if responde "$url"; then
+            decir "$nombre responde en $url"
+        else
+            decir "$nombre NO responde en $url"
+        fi
+    done
+}
+
+cmd_abrir() {
+    if command -v curl >/dev/null 2>&1 && ! responde "http://127.0.0.1:${PUERTO_API}/salud"; then
+        avisar "La API no responde todavia. Si no arrancaste nada, ejecuta antes: ./fraude todo"
+    fi
+    if [ "$(id -u)" -ne 0 ] && command -v xdg-open >/dev/null 2>&1; then
+        decir "Abriendo $URL_PAGINA en el navegador..."
+        xdg-open "$URL_PAGINA" >/dev/null 2>&1 || avisar "No pude abrir el navegador; abre $URL_PAGINA a mano."
+    else
+        decir "Abre esta direccion en el navegador (Super + Shift + Return): $URL_PAGINA"
+    fi
+    decir "En esta version la pagina de simulacion aun no existe (llega en la fase 6)."
+    decir "Por ahora puedes ver el estado en $URL_PAGINA/salud"
+}
+
+cmd_apagar() {
+    detectar_docker || return 1
+    decir "Deteniendo los servicios..."
+    compose down || return 1
+    decir "Todo detenido. Los resultados siguen en resultados/."
+}
+
+principal() {
+    local comando="${1:-ayuda}"
+    [ "$#" -gt 0 ] && shift
+    case "$comando" in
+        ayuda | -h | --help) ayuda ;;
+        todo) cmd_todo "$@" ;;
+        evidencia) cmd_evidencia ;;
+        preparar | entrenar | evaluar | demostrar) cmd_paso "$comando" "$@" ;;
+        abrir) cmd_abrir ;;
+        estado) cmd_estado ;;
+        apagar) cmd_apagar ;;
+        *)
+            fallar "No conozco el comando: $comando"
+            ayuda >&2
+            return 2
+            ;;
+    esac
+}
+
+principal "$@"

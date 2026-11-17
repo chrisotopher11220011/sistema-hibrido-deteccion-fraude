@@ -1,0 +1,40 @@
+{
+  "id": "FraudePing000001",
+  "name": "Ping",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ping",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5b0a4c1e-6f0f-4b57-9a35-0d8f3c9e1a01",
+      "name": "Webhook ping",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "9d2f6c3a-1b7e-4e0a-8c54-2a6f7b1d3e02"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"estado\": \"ok\", \"flujo\": \"ping\"}",
+        "options": {}
+      },
+      "id": "c7e1d2f4-3a8b-4c6d-9e0f-5b4a3c2d1e03",
+      "name": "Responder ok",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [220, 0]
+    }
+  ],
+  "connections": {
+    "Webhook ping": {
+      "main": [[{"node": "Responder ok", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {"executionOrder": "v1"},
+  "pinData": {}
+}
