@@ -27,6 +27,7 @@ muestra:
   filas: 6000
   fraudes: 60
   semilla: 7
+  con_time: true            # false para comprobar que todo funciona sin la columna Time
 
 # Transacciones sinteticas de ubicacion (ADR 0006). Solo para la prueba funcional de la regla.
 sinteticos:
