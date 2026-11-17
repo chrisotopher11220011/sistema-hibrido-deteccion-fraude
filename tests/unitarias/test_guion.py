@@ -313,3 +313,39 @@ def test_anfitrion_sigue_siendo_json_si_una_orden_devuelve_colores(guion):
 
     anfitrion = json.loads((guion.en_curso() / "anfitrion.json").read_text())
     assert anfitrion["omarchy"] == {"version": "4.0.3", "obtenida_de": "omarchy-version"}
+
+
+def test_todo_con_muestra_la_pasa_a_tareas(guion):
+    resultado = guion.ejecutar("todo", "--muestra")
+
+    assert resultado.returncode == 0, resultado.stderr
+    assert any("tareas todo --sin-evidencia --muestra" in linea for linea in guion.llamadas())
+    assert "muestra" in resultado.stdout
+
+
+def test_todo_sin_muestra_no_la_pasa(guion):
+    guion.ejecutar("todo")
+
+    assert not any("--muestra" in linea for linea in guion.llamadas())
+
+
+def test_preparar_suelto_con_muestra(guion):
+    guion.ejecutar("preparar", "--muestra")
+
+    assert any("tareas preparar --muestra" in linea for linea in guion.llamadas())
+
+
+def test_una_sesion_nueva_no_arrastra_datos_de_la_anterior(guion):
+    en_curso = guion.en_curso()
+    (en_curso / "eda").mkdir(parents=True)
+    (en_curso / "eda" / "vieja.png").write_bytes(b"x")
+    (en_curso / "datos.json").write_text("{}")
+
+    guion.ejecutar("todo")
+
+    assert not (en_curso / "datos.json").exists()
+    assert not (en_curso / "eda").exists()
+
+
+def test_la_ayuda_explica_la_muestra(guion):
+    assert "--muestra" in guion.ejecutar("ayuda").stdout

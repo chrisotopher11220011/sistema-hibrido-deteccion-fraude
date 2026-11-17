@@ -2,14 +2,14 @@
 
 Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por cierto sin haberlo visto en el computador de ejecución y cómo se comprobará. Estados: **pendiente**, **confirmado** o **refutado**. Solo la evidencia de una ejecución N3 confirma o refuta, salvo S10, que es un supuesto sobre N2.
 
-- **Última actualización:** 2026-11-17 (UTC), al cerrar la fase 1.
+- **Última actualización:** 2026-11-17 (UTC), al cerrar la fase 2.
 - **Evidencia N3 recibida hasta hoy:** ninguna.
 
 | N.º | Supuesto | Cómo se comprueba | Estado | Notas |
 |---|---|---|---|---|
 | S1 | Docker y Docker Compose están instalados y en marcha en Omarchy 4 | `anfitrion.json` | Pendiente | El manual de Omarchy lo afirma (leído el 2026-11-16) |
 | S2 | Los puertos 5678 y 8000 están libres | Arranque; `anfitrion.json` anota los que ya estaban en escucha antes de arrancar | Pendiente | Se cambian con `FRAUDE_PUERTO_API` y `FRAUDE_PUERTO_N8N` |
-| S3 | OpenML responde y entrega el mismo conjunto que Kaggle | `datos.json`: 284.807 filas y 492 fraudes | Pendiente | Fase 2 |
+| S3 | OpenML responde y entrega el mismo conjunto que Kaggle | `datos.json`: 284.807 filas y 492 fraudes | Pendiente | Desde la fase 2, `preparar` lo comprueba. `huellas.sha256_contenido` no depende del formato ni de `Time`: si alguien prepara también con el CSV de Kaggle y sale la misma huella, el supuesto queda confirmado del todo |
 | S4 | La versión fijada de n8n importa y activa los flujos sin pasos manuales | N2 y, en N3, `RESUMEN.md` y `registros/n8n.log` | Pendiente | **Comprobado en N2** con n8n 2.47.7, también en un segundo arranque con el volumen ya creado. Falta N3 |
 | S5 | El entrenamiento termina en minutos | `modelo.json` | Pendiente | Fase 3 |
 | S6 | El flujo responde cada transacción en pocos segundos | `flujo.json` | Pendiente | Fase 5 |
@@ -18,7 +18,7 @@ Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por 
 | S9 | Tras instalar el paquete de NVIDIA para contenedores, Docker usa la gráfica; si no, se usa el procesador | `anfitrion.json` y `explicaciones.json` | Pendiente | Fase 7. `anfitrion.json` ya anota si Docker tiene el runtime de NVIDIA |
 | S10 | GitHub Actions puede levantar n8n con Compose y probar el flujo | N2 desde la fase 1 | **Confirmado** | Es un supuesto sobre N2 y N2 lo demostró: CI en verde con el ping a n8n |
 | S11 | El cortafuegos de Omarchy no impide llegar a los puertos publicados en `127.0.0.1` ni la comunicación entre contenedores | Punto de prueba A: `errores.json` | Pendiente | `tareas` llama a `api` y a `n8n` por la red de Compose, y `./fraude estado` por `127.0.0.1` |
-| S12 | Los contenedores resuelven nombres y salen a internet para descargar datos e imágenes | Punto de prueba A y `datos.json` | Pendiente | En A solo se prueba la descarga de imágenes y la resolución de nombres entre contenedores; la salida a internet desde un contenedor se prueba en la fase 2 |
+| S12 | Los contenedores resuelven nombres y salen a internet para descargar datos e imágenes | Punto de prueba A y `datos.json` | Pendiente | Desde la versión 0.2.0, `./fraude todo` descarga el conjunto desde el contenedor `tareas`: `datos.json` con `fuente: openml` y `estado: ok` lo confirma |
 
 ## Supuestos nuevos de la fase 1
 
@@ -26,3 +26,11 @@ Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por 
 |---|---|---|---|
 | S13 | La versión de Omarchy puede leerse con `omarchy-version` o del archivo `version` de su carpeta de instalación | `anfitrion.json`: campo `omarchy` | Pendiente. Si queda «desconocida», se corrige con la evidencia |
 | S14 | `xdg-open` abre el navegador por defecto en Omarchy | Punto de prueba A: `OBSERVACIONES.md` | Pendiente. Si falla, el guion muestra la dirección para abrirla a mano |
+
+## Supuestos nuevos de la fase 2
+
+| N.º | Supuesto | Cómo se comprueba | Estado |
+|---|---|---|---|
+| S15 | El ARFF de OpenML 1597 se lee con el lector del proyecto: 31 atributos, `Class` nominal con `0` y `1`, valores numéricos separados por comas. El lector acepta comillas o su ausencia y la falta de `Time` | `datos.json`: `estado: ok`, `columnas` y `tiene_time` | Pendiente. Metadatos de OpenML leídos el 2026-11-17; el archivo en sí no pudo verse desde el entorno de desarrollo |
+| S16 | El archivo que sirve OpenML coincide con la suma MD5 que publica (`178bcf9b…`) | `datos.json`: `huellas.md5_coincide` | Pendiente. Si no coincide, `preparar` prueba la otra dirección y, si tampoco, falla sin dejar archivos a medias |
+| S17 | `preparar` con el conjunto real tarda segundos y cabe con holgura en 16 GB | `datos.json`: `duracion_s` | Pendiente. Ensayo N1 con un archivo inventado del mismo tamaño (168 MB): unos 2 s por ejecución, sin contar la descarga, y menos de 1 GB de memoria |

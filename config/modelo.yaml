@@ -1,6 +1,37 @@
-# Isolation Forest (docs/spec.md, seccion 11). El entrenamiento llega en la fase 3,
-# que fija aqui los parametros iniciales. Los umbrales no se escriben a mano:
-# se eligen en validacion y quedan en modelo.json.
+# Datos e Isolation Forest (docs/spec.md, secciones 9 y 11). Ningun parametro vive en el codigo.
+# Los umbrales del modelo no se escriben a mano: se eligen en validacion y quedan en modelo.json.
 semilla: 42
 variables: [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17,
             V18, V19, V20, V21, V22, V23, V24, V25, V26, V27, V28, Amount]
+
+# Conjunto real: OpenML 1597 (ADR 0002). Verificado en la API de OpenML el 2026-11-17.
+datos:
+  urls:
+    - https://openml.org/data/v1/download/1673544/creditcard.arff
+    - https://www.openml.org/data/download/1673544/phpKo8OWT
+  md5_openml: 178bcf9bb1f31a3dfe12d0e577884add   # Suma publicada por OpenML para ese archivo.
+  tiempo_limite_s: 300
+  filas_esperadas: 284807
+  fraudes_esperados: 492
+  # Huellas SHA-256 del contenido aceptadas. Vacia hasta que la primera ejecucion N3 la fije.
+  huellas_sha256_conocidas: []
+
+# Particion estratificada (ADR 0003): 70 % desarrollo y 30 % prueba; el desarrollo, 80/20.
+particion:
+  semilla: 42
+  prueba: 0.30
+  validacion: 0.20
+
+# Muestra para pruebas (N1 y N2). Misma forma que el conjunto real; no produce metricas reportables.
+muestra:
+  filas: 6000
+  fraudes: 60
+  semilla: 7
+  con_time: true            # false para comprobar que todo funciona sin la columna Time
+
+# Transacciones sinteticas de ubicacion (ADR 0006). Solo para la prueba funcional de la regla.
+sinteticos:
+  cantidad: 40
+  semilla: 2026
+  paises: [EC, CO, PE, US, ES, MX]
+  monto_maximo: 5000

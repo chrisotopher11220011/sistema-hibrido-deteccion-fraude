@@ -6,7 +6,7 @@ No bloquea operaciones reales ni está pensado para producción. El sistema señ
 
 ## Estado
 
-**Versión 0.1.0 — Fase 1, cimientos.** Existe la estructura, el arranque con un comando, la API con `/salud`, n8n con el flujo de comprobación `ping`, la evidencia mínima y la integración continua. Todavía **no hay** datos, reglas, modelo ni página de simulación, y por tanto no hay ninguna cifra de desempeño.
+**Versión 0.2.0 — Fase 2, datos y reglas.** Además de los cimientos de la fase 1 (arranque con un comando, API con `/salud`, n8n con el flujo `ping`, evidencia e integración continua), existen la preparación de los datos (descarga verificada, partición y análisis exploratorio), el motor de reglas deterministas y los datos sintéticos de ubicación. Todavía **no hay** modelo ni página de simulación, y por tanto no hay ninguna cifra de desempeño.
 
 El avance detallado está en [`docs/ESTADO.md`](docs/ESTADO.md) y los cambios en [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -25,6 +25,8 @@ La guía paso a paso, con lo que debería verse en cada momento, está en [`EJEC
 | Comando | Qué hace |
 |---|---|
 | `./fraude todo` | Arranca los servicios, ejecuta los pasos que existen y reúne la evidencia |
+| `./fraude todo --muestra` | Lo mismo con datos de prueba generados, sin descargar el conjunto real (sus cifras no se reportan) |
+| `./fraude preparar` | Solo el paso de datos: descarga, verificación, partición y análisis exploratorio |
 | `./fraude evidencia` | Reúne de nuevo la evidencia |
 | `./fraude abrir` | Abre la página en el navegador |
 | `./fraude estado` | Dice qué servicios están en marcha |

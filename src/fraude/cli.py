@@ -7,9 +7,11 @@ import sys
 from pathlib import Path
 
 from fraude.evidencia import comprobar_servicios, reunir_evidencia
+from fraude.preparar import preparar
 
+PASOS = ("preparar", "entrenar", "evaluar", "demostrar")
 # Paso -> fase en la que empieza a existir.
-PASOS_FUTUROS = {"preparar": 2, "entrenar": 3, "evaluar": 3, "demostrar": 5}
+PASOS_FUTUROS = {"entrenar": 3, "evaluar": 3, "demostrar": 5}
 
 
 def _raiz() -> Path:
@@ -24,10 +26,30 @@ def _mensaje_futuro(paso: str) -> str:
     return f"El paso «{paso}» llega en la fase {PASOS_FUTUROS[paso]}; en esta version no hace nada."
 
 
-def _ejecutar_pasos() -> list[dict]:
-    """Ejecuta, en orden, los pasos que ya existen. En la fase 1 no existe ninguno."""
+def _paso_preparar(muestra: bool) -> dict:
+    """Ejecuta `preparar`. Cualquier fallo se registra y no detiene `todo`."""
+    print("[preparar] Obteniendo y verificando los datos" + (" (muestra)..." if muestra else "..."))
+    try:
+        informe = preparar(_raiz(), muestra=muestra)
+    except Exception as error:  # noqa: BLE001 - todo debe terminar siempre con evidencia
+        detalle = f"{type(error).__name__}: {error}"
+        print(f"[preparar] ERROR: {detalle}")
+        return {"paso": "preparar", "estado": "fallo", "detalle": detalle}
+    detalle = (
+        f"Fuente {informe['fuente']}: {informe['filas']} transacciones, "
+        f"{informe['fraudes']} fraudes; particion {informe['particion']['estado']}."
+    )
+    print(f"[preparar] Listo. {detalle}")
+    return {"paso": "preparar", "estado": "ok", "detalle": detalle}
+
+
+def _ejecutar_pasos(muestra: bool = False) -> list[dict]:
+    """Ejecuta, en orden, los pasos que ya existen y anota los que llegan despues."""
     pasos = []
-    for paso in PASOS_FUTUROS:
+    for paso in PASOS:
+        if paso == "preparar":
+            pasos.append(_paso_preparar(muestra))
+            continue
         print(f"[{paso}] {_mensaje_futuro(paso)}")
         pasos.append({"paso": paso, "estado": "no_disponible", "detalle": _mensaje_futuro(paso)})
     archivo = _archivo_pasos()
@@ -68,6 +90,9 @@ def _analizador() -> argparse.ArgumentParser:
         prog="fraude", description="Tareas del prototipo de deteccion hibrida de fraude."
     )
     comandos = analizador.add_subparsers(dest="comando", metavar="comando")
+    ayuda_muestra = "Usa la muestra para pruebas en lugar del conjunto real (no reportable)"
+    preparar_ = comandos.add_parser("preparar", help="Descarga y verifica los datos y los parte")
+    preparar_.add_argument("--muestra", action="store_true", help=ayuda_muestra)
     for paso, fase in PASOS_FUTUROS.items():
         comandos.add_parser(paso, help=f"Disponible desde la fase {fase}")
     comandos.add_parser("evidencia", help="Reune los archivos de evidencia")
@@ -77,6 +102,7 @@ def _analizador() -> argparse.ArgumentParser:
         action="store_true",
         help="No reunir evidencia al final (lo usa ./fraude, que la reune despues)",
     )
+    todo.add_argument("--muestra", action="store_true", help=ayuda_muestra)
     return analizador
 
 
@@ -89,9 +115,11 @@ def main(argv: list[str] | None = None) -> int:
     if opciones.comando in PASOS_FUTUROS:
         print(_mensaje_futuro(opciones.comando))
         return 2
+    if opciones.comando == "preparar":
+        return 0 if _paso_preparar(opciones.muestra)["estado"] == "ok" else 1
     if opciones.comando == "evidencia":
         return _evidencia(_pasos_guardados())
-    pasos = _ejecutar_pasos()
+    pasos = _ejecutar_pasos(opciones.muestra)
     if opciones.sin_evidencia:
         return 1 if any(p["estado"] == "fallo" for p in pasos) else 0
     return _evidencia(pasos)

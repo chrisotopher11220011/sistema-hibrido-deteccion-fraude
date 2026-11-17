@@ -20,7 +20,17 @@ from pathlib import Path
 
 from fraude import __version__
 
-DEPENDENCIAS = ("fastapi", "uvicorn", "pydantic", "starlette")
+DEPENDENCIAS = (
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "starlette",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "matplotlib",
+    "pyyaml",
+)
 PATRON_SECRETO = re.compile(
     r"(?i)\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|CLAVE|API_KEY)[A-Z0-9_]*)(\s*[=:]\s*)(\S+)"
 )
@@ -195,6 +205,29 @@ def _copiar_carpeta(origen: Path, destino: Path, texto: bool) -> int:
     return copiados
 
 
+def _copiar_datos(en_curso: Path, carpeta: Path) -> list[str]:
+    """Copia lo que deja `preparar` (`datos.json` y `eda/`) y resume su estado."""
+    origen = en_curso / "datos.json"
+    if not origen.is_file():
+        return ["Sin datos.json: el paso preparar no se ejecuto en esta sesion."]
+    shutil.copyfile(origen, carpeta / "datos.json")
+    if (en_curso / "eda").is_dir():
+        _copiar_carpeta(en_curso / "eda", carpeta / "eda", texto=False)
+    try:
+        informe = json.loads(origen.read_text(encoding="utf-8"))
+    except ValueError:
+        return ["datos.json no se pudo leer."]
+    if informe.get("estado") != "ok":
+        return [f"Datos: preparar no termino bien ({informe.get('error', 'sin detalle')})."]
+    nota = (
+        f"Datos: fuente {informe.get('fuente')}, {informe.get('filas')} transacciones, "
+        f"{informe.get('fraudes')} fraudes."
+    )
+    if not informe.get("reportable", False):
+        nota += " Es la muestra para pruebas: no reportable, no representa el fraude real."
+    return [nota]
+
+
 def _resumen(
     momento: datetime,
     commit: str,
@@ -232,7 +265,9 @@ def _resumen(
         "",
         "## Alcance",
         "",
-        "Esta version comprueba el arranque. No contiene metricas de deteccion de fraude.",
+        "Esta version comprueba el arranque y prepara los datos (verificacion, particion,",
+        "analisis exploratorio de la parte de ajuste y datos sinteticos de ubicacion).",
+        "No contiene metricas de deteccion de fraude: el modelo llega en la fase 3.",
         "",
     ]
     return "\n".join(lineas)
@@ -271,6 +306,7 @@ def reunir_evidencia(
     if _copiar_carpeta(en_curso / "registros", carpeta / "registros", texto=True) == 0:
         notas.append("Sin registros de los servicios: los guarda ./fraude desde el anfitrion.")
     capturas = _copiar_carpeta(en_curso / "capturas", carpeta / "capturas", texto=False)
+    notas += _copiar_datos(en_curso, carpeta)
     notas.append(f"Capturas de pantalla copiadas: {capturas}.")
 
     observaciones = en_curso / "OBSERVACIONES.md"

@@ -1,6 +1,6 @@
-# Reglas deterministas (docs/spec.md, seccion 10). El motor llega en la fase 2.
+# Reglas deterministas (docs/spec.md, seccion 10). Motor: src/fraude/reglas.py.
 # Ningun umbral va dentro del codigo: se cambia aqui.
-version: "0.1.0"
+version: "0.2.0"
 reglas:
   MONTO_ALTO:
     umbral_monto: 1000        # Se aplica a `Amount` tal cual; el conjunto no indica moneda.

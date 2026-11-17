@@ -2,11 +2,12 @@
 
 Esta guía es para quien ejecuta el sistema en su computador. No hace falta saber programar ni instalar nada: Omarchy 4 ya trae Docker, Docker Compose, Git y el navegador.
 
-**Versión 0.1.0 (punto de prueba A).** Esta versión solo comprueba que el sistema arranca en tu equipo. Toma unos cinco minutos, más la descarga de la primera vez. Aún no hay página de simulación ni detección de fraude.
+**Versión 0.2.0.** Comprueba que el sistema arranca en tu equipo (punto de prueba A) y, además, descarga y prepara los datos del proyecto. Toma unos cinco minutos, más las descargas de la primera vez (imágenes de Docker y unos 150 MB de datos). Aún no hay página de simulación ni detección de fraude.
 
 ## Antes de empezar
 
-- Conexión a internet: la primera vez se descargan imágenes de Docker.
+- Conexión a internet: la primera vez se descargan imágenes de Docker y el conjunto de datos (unos 150 MB, desde OpenML; no hace falta cuenta).
+- Espacio en disco: con 1 GB libre sobra para los datos.
 - Tu contraseña de usuario: Docker la pedirá a través de `sudo`. Es lo normal en Omarchy 4, donde tu usuario no pertenece al grupo `docker`. **No hace falta** activar *Setup > Security > Sudoless Docker* ni cambiar nada de la seguridad del sistema.
 - El repositorio es privado. Si `git clone` pide credenciales, ejecuta antes `gh auth login` y sigue sus pasos con tu cuenta de GitHub.
 
@@ -32,7 +33,7 @@ cd sistema-hibrido-deteccion-fraude
 1. `Docker pide permisos de administrador (es lo normal en Omarchy 4).` y después la petición de tu contraseña. Al escribirla no se ve nada en pantalla; es normal.
 2. `Paso 1 de 3: construir y arrancar los servicios (api y n8n).` Aquí se descargan las imágenes. La primera vez puede tardar varios minutos; las siguientes, menos de uno.
 3. `Servicios en marcha: la API y n8n responden.`
-4. `Paso 2 de 3: ejecutar los pasos del proyecto.` En esta versión cada paso solo avisa de que llega en una fase posterior.
+4. `Paso 2 de 3: ejecutar los pasos del proyecto.` Primero `[preparar] Descargando el conjunto de OpenML (unos 150 MB)...` y, al terminar, una línea como `[preparar] Listo. Fuente openml: 284807 transacciones, 492 fraudes; particion creada.` Si la columna `Time` no llega, verás un `AVISO` sobre ella: es esperable y el paso sigue. Los demás pasos solo avisan de que llegan en una fase posterior.
 5. `Paso 3 de 3: evidencia.` y una línea como `Evidencia lista: resultados/20261117T153000Z_ab12cd3/ y resultados/20261117T153000Z_ab12cd3.zip`.
 6. `Todo termino bien.`
 
@@ -80,6 +81,8 @@ Si quieres, haz una captura con `Print Screen`. Se guarda sola en `~/Pictures/Sc
 | ¿El cortafuegos deja llegar a los puertos locales y deja hablar a los contenedores? | `RESUMEN.md` y `errores.json` |
 | ¿n8n arranca y publica sus flujos sin pasos manuales? | `RESUMEN.md` y `registros/n8n.log` |
 | ¿Los puertos 8000 y 5678 estaban libres? | `anfitrion.json` y `errores.json` |
+| ¿Los contenedores salen a internet y OpenML entrega el conjunto esperado? | `datos.json`: 284.807 transacciones y 492 fraudes |
+| ¿Cómo es el conjunto en la parte de ajuste? | `eda/` (resumen y figuras) |
 
 ## Si algo va mal
 
@@ -87,6 +90,8 @@ Si quieres, haz una captura con `Print Screen`. Se guarda sola en `~/Pictures/Sc
 |---|---|
 | `No pude obtener permisos con sudo` | Vuelve a ejecutar `./fraude todo` y escribe tu contraseña de usuario |
 | `Docker no responde ni con sudo` | `sudo systemctl start docker` y repite |
+| `[preparar] ERROR: ... No pude descargar el conjunto de OpenML` | El resto sigue igual. Si OpenML no responde, descarga `creditcard.csv` desde https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud (necesita cuenta de Kaggle), déjalo en `datos/crudos/creditcard.csv` dentro de la carpeta del proyecto y repite `./fraude todo` |
+| `[preparar] ERROR` por conteos, suma MD5 o huella | No borres nada. Ejecuta `./fraude evidencia` y envía el `.zip`: `datos.json` dice qué no coincidió |
 | Un mensaje de que el puerto 8000 o 5678 ya está en uso | Usa otros puertos. Escribe una vez `export FRAUDE_PUERTO_API=8010 FRAUDE_PUERTO_N8N=5690` y, en esa misma terminal, repite `./fraude todo`. Las demás órdenes (`estado`, `abrir`, `evidencia`, `apagar`) deben ejecutarse en esa misma terminal |
 | Se queda mucho tiempo en el paso 1 | La primera descarga depende de tu conexión. Si n8n no responde pasados entre cuatro y siete minutos, el guion lo da por fallido y guarda los registros |
 | Cualquier otro `ERROR` | Ejecuta `./fraude evidencia` y envía el `.zip`. Con eso basta para diagnosticarlo |
@@ -96,7 +101,7 @@ Ejecutar `./fraude todo` varias veces no rompe nada. Para volver a empezar de ce
 ## Qué deja en tu equipo
 
 - Imágenes y un volumen de Docker del proyecto `fraude`.
-- Las carpetas `datos/` y `resultados/` dentro del repositorio, a tu nombre.
+- Las carpetas `datos/` (unos 150 MB con el conjunto descargado) y `resultados/` dentro del repositorio, a tu nombre.
 - Nada queda visible en la red: los puertos se publican solo en `127.0.0.1`.
 
 Para borrar todo al terminar el proyecto: `./fraude apagar`, luego `sudo docker compose down --volumes --rmi local` dentro de la carpeta, y borra la carpeta.
