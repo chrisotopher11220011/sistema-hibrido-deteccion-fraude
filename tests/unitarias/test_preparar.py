@@ -109,7 +109,8 @@ def test_el_analisis_exploratorio_usa_solo_la_parte_de_ajuste(raiz):
 
 def test_informe_de_datos_trae_lo_que_pide_la_especificacion(raiz):
     informe = preparar(raiz, muestra=True)
-    for clave in ("fuente", "filas", "fraudes", "columnas", "huellas", "particion", "fecha"):
+    claves = ("fuente", "filas", "fraudes", "columnas", "huellas", "particion", "fecha")
+    for clave in (*claves, "duracion_s"):
         assert clave in informe
     assert informe["columnas"][-2:] == ["Amount", "Class"]
     assert informe["fecha"].endswith("Z")

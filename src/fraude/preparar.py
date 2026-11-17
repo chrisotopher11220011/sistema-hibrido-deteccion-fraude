@@ -13,6 +13,7 @@ Lo que vuelve al equipo (`datos.json` y `eda/`) se escribe en `resultados/en_cur
 
 import json
 import shutil
+import time
 import urllib.request
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -193,6 +194,7 @@ def preparar(raiz: Path, muestra: bool = False, abrir: Callable = urllib.request
     en_curso = raiz / "resultados" / "en_curso"
     salida = en_curso / "datos.json"
     informe: dict = {"fecha": _fecha(), "estado": "en_curso", "notas": []}
+    inicio = time.monotonic()
     try:
         config = cargar(raiz, "modelo")
         config_reglas = cargar(raiz, "reglas")
@@ -253,6 +255,7 @@ def preparar(raiz: Path, muestra: bool = False, abrir: Callable = urllib.request
         informe["error"] = f"{error}" if isinstance(error, ErrorDatos) else repr(error)
         raise
     finally:
+        informe["duracion_s"] = round(time.monotonic() - inicio, 2)
         _escribir_json(salida, informe)
 
 

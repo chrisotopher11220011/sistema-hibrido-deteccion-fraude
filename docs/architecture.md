@@ -20,7 +20,7 @@ Página de simulación (navegador)
                                              +-------------------------------------+
 ```
 
-## Hoy (versión 0.1.0)
+## Hoy (versión 0.2.0)
 
 ```
 Computador de ejecución (Omarchy 4)
@@ -34,8 +34,40 @@ Computador de ejecución (Omarchy 4)
       ├─ n8n ............ n8n 2.47.7 · 127.0.0.1:5678 · GET /webhook/ping
       │                   arranque.sh: importar flujos → publicar → n8n start
       └─ tareas ......... línea de comandos (perfil «tareas», sin puerto)
+                          preparar: datos, partición, análisis exploratorio, sintéticos
                           comprueba api y n8n por la red interna y reúne la evidencia
 ```
+
+### Datos (fase 2)
+
+```
+OpenML 1597 (ARFF, MD5 publicada)  ─┐
+datos/crudos/creditcard.csv (Kaggle, a mano) ─┴─> leer y verificar (conteos, MD5, huella SHA-256)
+                                                     │
+                     partición estratificada 56/14/30, índices guardados
+                       ├─ ajuste ──────> análisis exploratorio (resultados/en_curso/eda/)
+                       ├─ validación     (umbrales y análisis de errores: fase 3)
+                       └─ prueba         (solo métricas agregadas: fase 3)
+
+generador sintético ──> datos/sinteticos/ubicacion.json ──> comprobación funcional de la regla
+                        (origen «sintetico», sin variables; nunca junto a los originales)
+```
+
+| Carpeta | Contenido |
+|---|---|
+| `datos/crudos/`, `datos/preparados/` | Conjunto real, su huella, la partición y `origen.json` |
+| `datos/muestra/` | Muestra para pruebas (N1 y N2), con la misma estructura |
+| `datos/sinteticos/` | Transacciones sintéticas de ubicación |
+
+| Módulo de `src/fraude/` | Responsabilidad |
+|---|---|
+| `transaccion.py` | Forma de la transacción (sección 8.2) |
+| `reglas.py` | Reglas deterministas y sus razones (sección 10) |
+| `datos.py` | Lectura de ARFF y CSV, descarga, huellas y conteos |
+| `particion.py` | Partición estratificada |
+| `muestra.py`, `sinteticos.py` | Muestra para pruebas y transacciones sintéticas |
+| `eda.py` | Análisis exploratorio y figuras de la parte de ajuste |
+| `preparar.py` | Orquesta el paso y escribe `datos.json` |
 
 | Pieza | Archivos |
 |---|---|
@@ -43,7 +75,7 @@ Computador de ejecución (Omarchy 4)
 | Servicios | `compose.yaml` |
 | n8n | `n8n/arranque.sh`, `n8n/flujos/*.json` |
 | Guion de ejecución | `fraude` |
-| Configuración | `config/*.yaml` |
+| Configuración | `config/*.yaml` (`modelo.yaml` también guarda los parámetros de datos, partición, muestra y sintéticos) |
 | Comprobación automática | `.github/workflows/ci.yml`, `tests/` |
 
 ## Reglas de diseño
