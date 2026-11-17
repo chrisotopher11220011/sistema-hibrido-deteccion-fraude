@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:redaccion",
+  "title": "Respuesta 200 de POST /explicacion",
+  "description": "Redacción de la explicación por el LLM local o motivo por el que se usa la plantilla (sección 14; ADR 0016). Con origen llm, el texto pasó la comprobación automática. Con origen plantilla, texto es null: n8n conserva su plantilla.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "origen",
+    "texto",
+    "modelo",
+    "duracion_ms",
+    "respaldo",
+    "comprobacion"
+  ],
+  "properties": {
+    "origen": {
+      "enum": [
+        "llm",
+        "plantilla"
+      ]
+    },
+    "texto": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "modelo": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "duracion_ms": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "respaldo": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/respaldo"
+        }
+      ]
+    },
+    "comprobacion": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/comprobacion"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "origen": {
+            "const": "llm"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "minLength": 1
+          },
+          "modelo": {
+            "type": "string"
+          },
+          "duracion_ms": {
+            "type": "number"
+          },
+          "respaldo": {
+            "type": "null"
+          },
+          "comprobacion": {
+            "type": "object",
+            "properties": {
+              "valida": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "origen": {
+            "const": "plantilla"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "texto": {
+            "type": "null"
+          },
+          "respaldo": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "respaldo": {
+      "description": "Por qué se usa la plantilla. modelo, duracion_ms y texto_descartado solo si se llegó a llamar al LLM.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "motivo",
+        "detalle"
+      ],
+      "properties": {
+        "motivo": {
+          "enum": [
+            "llm_desactivado",
+            "nivel_sin_redaccion",
+            "tiempo_agotado",
+            "error_llm",
+            "comprobacion_fallida",
+            "error_api"
+          ]
+        },
+        "detalle": {
+          "type": "string"
+        },
+        "modelo": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duracion_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "texto_descartado": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "comprobacion": {
+      "description": "Comprobación automática del texto del LLM (sección 15)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "valida",
+        "fallos"
+      ],
+      "properties": {
+        "valida": {
+          "type": "boolean"
+        },
+        "fallos": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

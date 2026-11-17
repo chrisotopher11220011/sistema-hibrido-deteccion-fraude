@@ -19,7 +19,8 @@ from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path
 
-from fraude import __version__
+from fraude import __version__, explicaciones
+from fraude.configuracion import cargar
 from fraude.registro import RegistroCasos, ruta_bd_casos
 
 DEPENDENCIAS = (
@@ -309,6 +310,9 @@ COLUMNAS_CASOS = (
     "decision_final",
     "explicacion_origen",
     "explicacion",
+    "explicacion_modelo",
+    "explicacion_duracion_ms",
+    "explicacion_respaldo",
     "notificacion_canal",
     "notificacion_estado",
     "version_reglas",
@@ -350,6 +354,9 @@ def _fila_caso(caso: dict) -> dict:
         "decision_final": caso["decision_final"],
         "explicacion_origen": explicacion.get("origen"),
         "explicacion": enmascarar(explicacion.get("texto") or ""),
+        "explicacion_modelo": explicacion.get("modelo"),
+        "explicacion_duracion_ms": explicacion.get("duracion_ms"),
+        "explicacion_respaldo": (explicacion.get("respaldo") or {}).get("motivo"),
         "notificacion_canal": notificacion.get("canal"),
         "notificacion_estado": notificacion.get("estado"),
         "version_reglas": versiones.get("reglas"),
@@ -378,6 +385,57 @@ def _escribir_csv(ruta: Path, columnas: tuple, filas: list[dict]) -> None:
         escritor = csv.DictWriter(archivo, fieldnames=columnas)
         escritor.writeheader()
         escritor.writerows(filas)
+
+
+def _exportar_explicaciones(raiz: Path, en_curso: Path, carpeta: Path) -> list[str]:
+    """`llm.json` (si se preparo el LLM) y `explicaciones.json` (seccion 16; ADR 0016)."""
+    notas = []
+    servidor = _leer(en_curso / "llm.json")
+    if servidor is not None:
+        shutil.copyfile(en_curso / "llm.json", carpeta / "llm.json")
+        if servidor.get("estado") == "ok":
+            fraccion = (servidor.get("memoria") or {}).get("fraccion_en_grafica")
+            lugar = (
+                "sin dato de la grafica"
+                if fraccion is None
+                else (f"segun Ollama, {fraccion:.0%} de su memoria en la grafica")
+            )
+            anfitrion = (_leer(en_curso / "anfitrion.json") or {}).get("llm") or {}
+            if anfitrion.get("ejecucion"):
+                lugar += f"; ./fraude lo arranco con {anfitrion['ejecucion']}"
+            if anfitrion.get("grafica_memoria_usada_mib") is not None:
+                lugar += f" y nvidia-smi marca {anfitrion['grafica_memoria_usada_mib']} MiB usados"
+            coincide = (servidor.get("modelo") or {}).get("coincide_con_el_fijado")
+            aviso = "" if coincide is not False else " AVISO: el resumen no es el fijado."
+            notas.append(
+                f"LLM local: {servidor['modelo']['nombre']} en Ollama "
+                f"{servidor['servidor']['version']}, {lugar} (llm.json).{aviso}"
+            )
+        else:
+            notas.append(
+                f"LLM local: no quedo listo ({servidor.get('error')}); las explicaciones "
+                "usaron la plantilla (llm.json)."
+            )
+    else:
+        notas.append("Sin LLM local en esta ejecucion: las explicaciones son de plantilla.")
+    ruta = ruta_bd_casos(raiz)
+    casos = RegistroCasos(ruta).todos() if ruta.is_file() else []
+    try:
+        config = cargar(raiz, "llm")
+    except FileNotFoundError:
+        config = None
+    contenido = explicaciones.resumir(casos, config, servidor, enmascarar)
+    _escribir_json(carpeta / "explicaciones.json", contenido)
+    if contenido["total"]:
+        c = contenido["comprobacion"]
+        motivos = ", ".join(f"{m} {n}" for m, n in contenido["respaldos"].items()) or "ninguno"
+        notas.append(
+            f"Explicaciones: {contenido['total']} casos, {contenido['por_origen']['llm']} por el "
+            f"LLM y {contenido['por_origen']['plantilla']} por plantilla (respaldos: {motivos}); "
+            f"comprobacion automatica: {c['fallidos']} de {c['textos_comprobados']} textos del "
+            "LLM no la pasaron (explicaciones.json)."
+        )
+    return notas
 
 
 def _exportar_casos(raiz: Path, carpeta: Path) -> list[str]:
@@ -648,6 +706,7 @@ def reunir_evidencia(
     notas += _copiar_modelo_y_evaluacion(en_curso, carpeta)
     notas += _copiar_flujo(en_curso, carpeta)
     notas += _exportar_casos(Path(raiz), carpeta)
+    notas += _exportar_explicaciones(Path(raiz), en_curso, carpeta)
     notas += _exportar_simulacion(Path(raiz), en_curso, carpeta)
     notas.append(f"Capturas de pantalla copiadas: {capturas}.")
 

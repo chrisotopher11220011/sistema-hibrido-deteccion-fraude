@@ -2,7 +2,9 @@
 
 Esta guía es para quien ejecuta el sistema en su computador. No hace falta saber programar ni instalar nada: Omarchy 4 ya trae Docker, Docker Compose, Git y el navegador.
 
-**Versión 0.6.0 — punto de prueba C: el sistema completo con la página.** Además de lo que comprobaba el punto B (arranque, datos reales, entrenamiento y métricas), ahora usarás la **página de simulación**, que es lo que verá el público del congreso. Toma unos quince minutos de ejecución, más las descargas de la primera vez (imágenes de Docker y unos 150 MB de datos), y unos veinte minutos usando la página.
+**Versión 0.7.0 — punto de prueba C, ahora con el LLM local.** Además de lo que comprobaba el punto B (arranque, datos reales, entrenamiento y métricas), usarás la **página de simulación**, que es lo que verá el público del congreso. Toma unos quince minutos de ejecución, más las descargas de la primera vez (imágenes de Docker y unos 150 MB de datos), y unos veinte minutos usando la página.
+
+Esta versión añade, como opción, un **modelo de lenguaje local** que redacta la explicación de cada alerta para quien revisa. No decide nada: el nivel lo pone el sistema antes. Si Christopher te pide «el punto C con LLM», sigue además la sección 6. La primera vez descarga unos **6,7 GB** (la imagen de Ollama, unos 3,4 GB, y el modelo, unos 3,3 GB).
 
 ## Antes de empezar
 
@@ -86,6 +88,59 @@ Para la exposición, la página puede abrirse en ventana propia con *Install > W
 
 **Deberías ver:** `Todo detenido. Los resultados siguen en resultados/.`
 
+## 6. LLM local (opcional): punto C con LLM
+
+Haz primero los pasos 1 a 5 sin LLM si aún no los hiciste: así la comparación es limpia. Luego:
+
+### 6.1 Preparar la gráfica para Docker (una sola vez)
+
+El modelo funciona también en el procesador, pero mucho más lento. Para que use la RTX 5060, Docker necesita el paquete de NVIDIA para contenedores. Compruébalo antes:
+
+```
+nvidia-smi
+```
+
+**Deberías ver:** una tabla con *NVIDIA GeForce RTX 5060* y la versión del controlador. Si dice que no encuentra la orden o no hay dispositivo, **no instales controladores por tu cuenta**: anótalo en `OBSERVACIONES.md` y salta al paso 6.2 (se usará el procesador).
+
+Si respondió, prepara Docker. Son tres órdenes y piden tu contraseña:
+
+```
+sudo pacman -S nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+(En lugar de la primera, también vale `omarchy pkg add nvidia-container-toolkit`, o *Install > Package* en el menú de Omarchy.)
+
+**Deberías ver:** la primera instala el paquete (unos pocos MB); la segunda muestra un mensaje sobre la configuración de Docker (`/etc/docker/daemon.json`); la tercera no dice nada. Si quieres comprobarlo (descarga una imagen pequeña):
+
+```
+sudo docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
+```
+
+debe mostrar la misma tabla que `nvidia-smi`. Esto **no** usa los modelos locales propios de Omarchy (`omarchy agent local`): el proyecto trae su propio servidor dentro de Docker.
+
+### 6.2 Ejecutar con el LLM
+
+```
+./fraude todo --llm
+```
+
+**Deberías ver**, además de lo del paso 2:
+
+1. `LLM local activado: usara la grafica NVIDIA.` Si la gráfica no está preparada, en cambio, `LLM local activado en el procesador (mas lento)…` con las órdenes del paso 6.1. Las dos sirven; anota cuál apareció.
+2. `Paso 1 de 3: construir y arrancar los servicios (api, n8n y llm).` La primera vez descarga la imagen de Ollama (unos 3,4 GB): puede tardar bastante según tu conexión.
+3. `[llm] Servidor Ollama 0.40.16 …` y el progreso de la descarga del modelo: `[llm] Descargando qwen3.5:4b-q4_K_M: 10 % …` hasta `100 %` (unos 3,3 GB, solo la primera vez). Luego `[llm] Listo. Modelo qwen3.5:4b-q4_K_M listo en Ollama 0.40.16; segun Ollama, 100% de su memoria en la grafica (grafica; llm.json).` Si dice 0 %, la gráfica no se usó. Para confirmarlo, en otra terminal: `nvidia-smi` debe mostrar unos 3 GB más de memoria usada mientras el sistema está en marcha (la evidencia lo anota sola).
+4. El resto como siempre. `demostrar` tarda algo más: cada alerta espera su explicación.
+
+Si `[llm]` marca `ERROR`, o aparece `sigo sin el: las explicaciones usaran la plantilla`, **no pasa nada**: el resto funciona igual y la evidencia dice por qué.
+
+### 6.3 Mirar las explicaciones en la página
+
+`./fraude abrir` y usa la página como en el paso 3 (no hace falta repetirlo todo). En las alertas, el texto de la explicación termina en **«(explicación por modelo de lenguaje)»**; si el modelo falló, tardó o su texto no pasó la comprobación automática, termina en «(explicación por plantilla)». El **nivel** de cada transacción debe ser el mismo que sin LLM. 📷 de dos o tres alertas con su explicación.
+
+En `OBSERVACIONES.md` anota: si las explicaciones se entienden, si alguna dice algo raro o falso, y si notas que la página va más lenta. Luego `./fraude evidencia` y `./fraude apagar`, como en los pasos 4 y 5. El modelo descargado se queda guardado para la próxima vez.
+
 ## Qué comprueba esta prueba
 
 | Pregunta | Dónde queda la respuesta |
@@ -106,6 +161,8 @@ Para la exposición, la página puede abrirse en ventana propia con *Install > W
 | ¿Se guardaron las revisiones que hiciste en la página? | `revisiones.csv` |
 | ¿La página se ve bien en tu Chrome, en pantalla completa, en ventana estrecha y en modo presentación? | `capturas/` y `OBSERVACIONES.md` |
 | ¿Es fácil de usar? | Cuestionario SUS en `OBSERVACIONES.md` |
+| Con `--llm`: ¿Docker usa la gráfica? ¿Cuánta memoria de ella ocupa el modelo? | `anfitrion.json` (`llm`) y `llm.json` (`ejecucion`, `memoria`) |
+| Con `--llm`: ¿cuántas explicaciones redactó el modelo, cuánto tardó y cuántas descartó la comprobación? | `explicaciones.json` y `casos.csv` |
 
 ## Si algo va mal
 
@@ -120,19 +177,22 @@ Para la exposición, la página puede abrirse en ventana propia con *Install > W
 | `[entrenar] ERROR` o `[evaluar] ERROR` | Casi siempre es consecuencia de un `[preparar] ERROR` anterior: arréglalo primero. Si `preparar` terminó bien, ejecuta `./fraude evidencia` y envía el `.zip`: `modelo.json` y `metricas.json` dicen qué pasó |
 | La página dice «Aún no hay lote de demostración» | El paso `demostrar` no llegó a generarlo. Ejecuta `./fraude todo` otra vez y recarga la página |
 | La página dice «La API no responde» o «n8n no responde» | `./fraude estado`. Si algo está detenido, `./fraude todo` y recarga la página |
+| `[llm] ERROR: … no responde` o fallo de descarga | Las explicaciones usan la plantilla; el resto vale. Comprueba tu conexión y repite `./fraude todo --llm`: la descarga sigue donde quedó |
+| `La grafica no arranco dentro de Docker; reintento con el LLM en el procesador.` | Sigue solo en el procesador. Repite el paso 6.1 (sobre todo `sudo systemctl restart docker`) y vuelve a `./fraude todo --llm` |
+| Con `--llm`, casi todas las explicaciones dicen «por plantilla» | Puede ser que el modelo tarde más de 20 s (procesador) o que sus textos no pasen la comprobación. No cambies nada: `explicaciones.json` lo dice |
 | Cualquier otro `ERROR` | Ejecuta `./fraude evidencia` y envía el `.zip`. Con eso basta para diagnosticarlo |
 
 Ejecutar `./fraude todo` varias veces no rompe nada. Para volver a empezar de cero: `./fraude apagar` y de nuevo `./fraude todo`.
 
 ## Qué deja en tu equipo
 
-- Imágenes y un volumen de Docker del proyecto `fraude`.
+- Imágenes y un volumen de Docker del proyecto `fraude`. Con `--llm`, además la imagen de Ollama y el volumen `fraude_ollama_modelos` con el modelo (los dos ocupan varios GB).
 - Las carpetas `datos/` (unos 150 MB con el conjunto descargado) y `resultados/` dentro del repositorio, a tu nombre.
 - Nada queda visible en la red: los puertos se publican solo en `127.0.0.1`.
 
-Para borrar todo al terminar el proyecto: `./fraude apagar`, luego `sudo docker compose down --volumes --rmi local` dentro de la carpeta, y borra la carpeta.
+Para borrar todo al terminar el proyecto: `./fraude apagar`, luego `sudo docker compose --profile llm down --volumes --rmi local` dentro de la carpeta (borra también el modelo descargado), `sudo docker image rm ollama/ollama:0.40.16` si usaste el LLM, y borra la carpeta.
 
 ## Más adelante
 
 - **Grabar la pantalla:** `Alt + Print Screen` inicia y detiene la grabación; el video queda en `~/Videos`.
-- **Explicación con LLM local (fase 7, opcional):** pedirá una preparación única de la gráfica para Docker (`nvidia-container-toolkit`). Se documentará aquí cuando esa fase la verifique.
+- **LLM local:** ver la sección 6. El paquete `nvidia-container-toolkit` puede quedarse instalado; si quieres quitarlo, `sudo pacman -R nvidia-container-toolkit` y `sudo systemctl restart docker` (Docker seguirá funcionando con el procesador).

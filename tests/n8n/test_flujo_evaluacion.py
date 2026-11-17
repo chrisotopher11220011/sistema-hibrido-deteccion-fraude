@@ -19,6 +19,8 @@ from fraude.decision import clasificar
 FLUJO = json.loads((FLUJOS / "evaluacion.json").read_text(encoding="utf-8"))
 NODOS = {n["name"]: n for n in FLUJO["nodes"]}
 EVALUAR, REGISTRAR = "Consultar evaluación", "Registrar caso"
+REDACTAR = "Redactar explicación"
+ALERTAS = ("alerta_prioritaria", "revision_recomendada")
 VERSION_FLUJO = f"transaccion-{__version__}"
 
 TRANSACCION = {
@@ -83,10 +85,61 @@ ESTADOS_REGLA = ("no_evaluable", "no_activada", "activada")
 COMBINACIONES = list(itertools.product(ESTADOS_REGLA, ESTADOS_REGLA, MODELOS))
 
 
-def _ejecutar(cuerpo, evaluar: list[dict] | None = None, registrar: list[dict] | None = None):
+# Respuesta de POST /explicacion sin LLM activo (lo normal sin --llm): plantilla y motivo.
+REDACCION_PLANTILLA = {
+    "statusCode": 200,
+    "body": {
+        "origen": "plantilla",
+        "texto": None,
+        "modelo": None,
+        "duracion_ms": None,
+        "respaldo": {
+            "motivo": "llm_desactivado",
+            "detalle": "El LLM local no está activo (./fraude todo sin --llm).",
+            "modelo": None,
+            "duracion_ms": None,
+            "texto_descartado": None,
+        },
+        "comprobacion": None,
+    },
+}
+TEXTO_LLM = "Alerta prioritaria: se activó MONTO_ALTO. Una persona debe revisarla."
+REDACCION_LLM = {
+    "statusCode": 200,
+    "body": {
+        "origen": "llm",
+        "texto": TEXTO_LLM,
+        "modelo": "qwen3.5:4b-q4_K_M",
+        "duracion_ms": 812.5,
+        "respaldo": None,
+        "comprobacion": {"valida": True, "fallos": []},
+    },
+}
+
+
+def _pide_redaccion(evaluar: list[dict] | None) -> bool:
+    """Si /evaluar responde senales validas y salen en alerta, n8n pide la redaccion."""
+    if not evaluar or "body" not in evaluar[-1] or evaluar[-1].get("statusCode") != 200:
+        return False
+    cuerpo = evaluar[-1]["body"]
+    if not isinstance(cuerpo, dict) or not isinstance(cuerpo.get("reglas"), list):
+        return False
+    return clasificar(cuerpo["reglas"], cuerpo.get("modelo")) in ALERTAS
+
+
+def _ejecutar(
+    cuerpo,
+    evaluar: list[dict] | None = None,
+    registrar: list[dict] | None = None,
+    redactar: list[dict] | None = None,
+):
     respuestas = {REGISTRAR: registrar or [{"statusCode": 201, "body": REGISTRADO}]}
     if evaluar is not None:
         respuestas[EVALUAR] = evaluar
+    if redactar is None and _pide_redaccion(evaluar):
+        redactar = [REDACCION_PLANTILLA]
+    if redactar is not None:
+        respuestas[REDACTAR] = redactar
     return simular(FLUJO, cuerpo, respuestas)
 
 
@@ -379,3 +432,149 @@ def test_ninguna_rama_deja_respuestas_simuladas_sin_usar():
     resultado = _ejecutar(TRANSACCION, [{"statusCode": 200, "body": senales}])
     assert resultado["sobrantes"] == {}
     assert Path(FLUJOS / "evaluacion.json").is_file()
+
+
+# --- Explicacion con el LLM local (fase 7, ADR 0016) ---------------------------------------
+
+
+def _peticiones(resultado: dict, nodo: str) -> list[dict]:
+    return [p for p in resultado["peticiones"] if p["nodo"] == nodo]
+
+
+def test_redaccion_sin_reintento_y_con_mas_tiempo_que_el_llm():
+    import yaml
+    from simulacion import RAIZ
+
+    limite_llm = yaml.safe_load((RAIZ / "config" / "llm.yaml").read_text())["tiempo_limite_s"]
+    nodo = NODOS[REDACTAR]
+    assert nodo["parameters"]["url"] == "http://api:8000/explicacion"
+    assert not nodo.get("retryOnFail")
+    assert nodo["onError"] == "continueErrorOutput"
+    assert nodo["parameters"]["options"]["response"]["response"]["neverError"] is True
+    # n8n espera al menos 5 s mas que la API al LLM: el respaldo de la API llega antes.
+    assert nodo["parameters"]["options"]["timeout"] >= (limite_llm + 5) * 1000
+
+
+@pytest.mark.parametrize(("monto", "ubicacion", "modelo"), COMBINACIONES)
+def test_solo_las_alertas_piden_redaccion_con_el_nivel_ya_decidido(monto, ubicacion, modelo):
+    senales = _senales(monto, ubicacion, modelo)
+    nivel = clasificar(senales["reglas"], senales["modelo"])
+    resultado = _ejecutar(TRANSACCION, [{"statusCode": 200, "body": senales}])
+    pedidas = _peticiones(resultado, REDACTAR)
+    if nivel in ALERTAS:
+        assert len(pedidas) == 1
+        cuerpo = pedidas[0]["cuerpo"]
+        validar_contrato("redaccion_pedida", cuerpo)
+        assert cuerpo == {"id_transaccion": "t-000457", "nivel": nivel, "senales": senales}
+        # La redaccion se pide despues de clasificar.
+        recorrido = resultado["recorrido"]
+        assert recorrido.index("Clasificar nivel") < recorrido.index(REDACTAR)
+    else:
+        assert pedidas == []
+
+
+@pytest.mark.parametrize(
+    "redaccion",
+    [
+        REDACCION_LLM,
+        REDACCION_PLANTILLA,
+        {"statusCode": 500, "body": {"error": {"tipo": "error_interno"}}},
+        {"error": {"message": "connect ECONNREFUSED 172.18.0.3:8000"}},
+        {"error": {"message": "timeout of 30000ms exceeded"}},
+    ],
+)
+def test_la_redaccion_nunca_cambia_el_nivel(redaccion):
+    for monto, ubicacion, modelo in COMBINACIONES:
+        senales = _senales(monto, ubicacion, modelo)
+        nivel = clasificar(senales["reglas"], senales["modelo"])
+        if nivel not in ALERTAS:
+            continue
+        resultado = _ejecutar(
+            TRANSACCION, [{"statusCode": 200, "body": senales}], None, [redaccion]
+        )
+        caso = _caso_enviado(resultado)
+        assert caso["nivel"] == nivel
+        assert resultado["respuesta"] == {"codigo": 200, "cuerpo": REGISTRADO}
+
+
+def test_la_redaccion_del_modelo_va_al_caso_con_su_trazabilidad():
+    senales = _senales("activada", "no_evaluable", "anomalia_alta")
+    resultado = _ejecutar(
+        TRANSACCION, [{"statusCode": 200, "body": senales}], None, [REDACCION_LLM]
+    )
+    caso = _caso_enviado(resultado)
+    assert caso["explicacion"] == {
+        "texto": TEXTO_LLM,
+        "origen": "llm",
+        "modelo": "qwen3.5:4b-q4_K_M",
+        "duracion_ms": 812.5,
+        "respaldo": None,
+        "comprobacion": {"valida": True, "fallos": []},
+    }
+    # Lo demas del caso no depende de quien redacto.
+    sin_llm = _caso_enviado(_ejecutar(TRANSACCION, [{"statusCode": 200, "body": senales}]))
+    for campo in ("nivel", "razones", "senales", "puntuacion", "notificacion", "versiones"):
+        assert caso[campo] == sin_llm[campo]
+
+
+def test_sin_llm_queda_la_plantilla_con_el_motivo_de_la_api():
+    senales = _senales("activada", "no_evaluable", "normal")
+    caso = _caso_enviado(_ejecutar(TRANSACCION, [{"statusCode": 200, "body": senales}]))
+    explicacion = caso["explicacion"]
+    assert explicacion["origen"] == "plantilla"
+    assert explicacion["texto"].startswith("El sistema señala esta transacción para revisión")
+    assert explicacion["modelo"] is None and explicacion["duracion_ms"] is None
+    assert explicacion["respaldo"]["motivo"] == "llm_desactivado"
+    assert explicacion["comprobacion"] is None
+
+
+def test_texto_descartado_por_la_comprobacion_queda_anotado():
+    senales = _senales("activada", "no_evaluable", "anomalia_alta")
+    descartado = {
+        "statusCode": 200,
+        "body": {
+            **REDACCION_PLANTILLA["body"],
+            "respaldo": {
+                "motivo": "comprobacion_fallida",
+                "detalle": "El texto no pasó la comprobación: afirmacion_prohibida",
+                "modelo": "qwen3.5:4b-q4_K_M",
+                "duracion_ms": 900.0,
+                "texto_descartado": "Es fraude.",
+            },
+            "comprobacion": {"valida": False, "fallos": ["afirmacion_prohibida"]},
+        },
+    }
+    evaluacion = [{"statusCode": 200, "body": senales}]
+    resultado = _ejecutar(TRANSACCION, evaluacion, redactar=[descartado])
+    explicacion = _caso_enviado(resultado)["explicacion"]
+    assert explicacion["origen"] == "plantilla"
+    assert "revisión prioritaria" in explicacion["texto"]
+    assert explicacion["respaldo"]["texto_descartado"] == "Es fraude."
+    assert explicacion["comprobacion"] == {"valida": False, "fallos": ["afirmacion_prohibida"]}
+
+
+@pytest.mark.parametrize(
+    ("redaccion", "pista"),
+    [
+        ({"statusCode": 500, "body": {"error": {"tipo": "error_interno"}}}, "500"),
+        ({"statusCode": 422, "body": {"error": {"tipo": "entrada_invalida"}}}, "422"),
+        ({"statusCode": 200, "body": {"origen": "llm"}}, "200"),
+        ({"statusCode": 200, "body": "texto"}, "200"),
+        ({"error": {"message": "connect ECONNREFUSED 172.18.0.3:8000"}}, "ECONNREFUSED"),
+    ],
+)
+def test_si_la_api_no_redacta_queda_la_plantilla_de_n8n(redaccion, pista):
+    senales = _senales("activada", "no_evaluable", "normal")
+    resultado = _ejecutar(TRANSACCION, [{"statusCode": 200, "body": senales}], redactar=[redaccion])
+    explicacion = _caso_enviado(resultado)["explicacion"]
+    assert explicacion["origen"] == "plantilla"
+    assert "señala" in explicacion["texto"]
+    assert explicacion["respaldo"]["motivo"] == "error_api"
+    assert pista in explicacion["respaldo"]["detalle"]
+    assert explicacion["comprobacion"] is None
+
+
+def test_error_de_evaluacion_y_sin_alerta_no_piden_redaccion():
+    resultado = _ejecutar(TRANSACCION, [{"statusCode": 503, "body": {"error": {}}}])
+    assert _peticiones(resultado, REDACTAR) == []
+    assert _caso_enviado(resultado)["explicacion"].get("respaldo") is None

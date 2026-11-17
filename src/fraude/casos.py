@@ -65,11 +65,41 @@ class Senales(_Estricto):
 # --- Caso -----------------------------------------------------------------------------
 
 
+MOTIVOS_RESPALDO = (
+    "llm_desactivado",
+    "nivel_sin_redaccion",
+    "tiempo_agotado",
+    "error_llm",
+    "comprobacion_fallida",
+    "error_api",
+)
+Duracion = Annotated[Numero, Field(ge=0)]
+
+
+class Respaldo(_Estricto):
+    """Por que se uso la plantilla en lugar del texto del LLM (ADR 0016)."""
+
+    motivo: Literal[MOTIVOS_RESPALDO]
+    detalle: str
+    modelo: str | None = None
+    duracion_ms: Duracion | None = None
+    texto_descartado: str | None = None
+
+
+class Comprobacion(_Estricto):
+    """Comprobacion automatica del texto del LLM (docs/spec.md, seccion 15)."""
+
+    valida: Logico
+    fallos: list[str]
+
+
 class Explicacion(_Estricto):
     texto: str
     origen: Literal["plantilla", "llm"]
     modelo: str | None = None
-    duracion_ms: Annotated[Numero, Field(ge=0)] | None = None
+    duracion_ms: Duracion | None = None
+    respaldo: Respaldo | None = None
+    comprobacion: Comprobacion | None = None
 
 
 class Notificacion(_Estricto):
@@ -116,6 +146,20 @@ class CasoNuevo(_Estricto):
                     f"un caso {self.nivel} debe traer {', '.join(faltan)}; "
                     "solo error_evaluacion puede no traerlos"
                 )
+        return self
+
+
+class RedaccionPedida(_Estricto):
+    """Cuerpo de `POST /explicacion`: el nivel ya decidido y las senales (ADR 0016)."""
+
+    id_transaccion: str | None = Field(default=None, max_length=100)
+    nivel: Literal[NIVELES]
+    senales: Senales | None
+
+    @model_validator(mode="after")
+    def _alerta_con_senales(self) -> "RedaccionPedida":
+        if self.nivel in ("alerta_prioritaria", "revision_recomendada") and self.senales is None:
+            raise ValueError(f"una redaccion de {self.nivel} necesita las senales")
         return self
 
 

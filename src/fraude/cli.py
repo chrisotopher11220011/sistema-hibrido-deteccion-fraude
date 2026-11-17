@@ -10,6 +10,7 @@ from fraude.demostrar import demostrar
 from fraude.entrenar import entrenar
 from fraude.evaluar import evaluar
 from fraude.evidencia import comprobar_servicios, reunir_evidencia
+from fraude.llm import preparar_llm
 from fraude.preparar import preparar
 
 PASOS = ("preparar", "entrenar", "evaluar", "demostrar")
@@ -60,7 +61,19 @@ def _detalle_demostrar(informe: dict) -> str:
     return detalle + (NO_REPORTABLE if not informe.get("reportable", True) else "")
 
 
+def _detalle_llm(informe: dict) -> str:
+    version = informe["servidor"]["version"]
+    memoria = informe.get("memoria") or {}
+    fraccion = memoria.get("fraccion_en_grafica")
+    en_grafica = "sin dato" if fraccion is None else f"{fraccion:.0%}"
+    return (
+        f"Modelo {informe['modelo']['nombre']} listo en Ollama {version}; segun Ollama, "
+        f"{en_grafica} de su memoria en la grafica ({informe.get('ejecucion')}; llm.json)."
+    )
+
+
 AVISOS = {
+    "llm": "Preparando el LLM local (la primera vez descarga el modelo, unos 3,3 GB)",
     "preparar": "Obteniendo y verificando los datos",
     "entrenar": "Entrenando Isolation Forest con la parte de ajuste y eligiendo umbrales",
     "evaluar": "Evaluando: configuraciones, lineas base, bootstrap, semillas y temporal",
@@ -71,6 +84,7 @@ AVISOS = {
 def _paso(nombre: str, muestra: bool) -> dict:
     """Ejecuta un paso. Cualquier fallo se registra y no detiene `todo`."""
     funcion, detallar = {
+        "llm": (preparar_llm, _detalle_llm),
         "preparar": (preparar, _detalle_preparar),
         "entrenar": (entrenar, _detalle_entrenar),
         "evaluar": (evaluar, _detalle_evaluar),
@@ -81,6 +95,8 @@ def _paso(nombre: str, muestra: bool) -> dict:
         informe = funcion(_raiz(), muestra=muestra)
     except Exception as error:  # noqa: BLE001 - todo debe terminar siempre con evidencia
         detalle = f"{type(error).__name__}: {error}"
+        if nombre == "llm":
+            detalle += ". Las explicaciones usaran la plantilla."
         print(f"[{nombre}] ERROR: {detalle}")
         return {"paso": nombre, "estado": "fallo", "detalle": detalle}
     detalle = detallar(informe)
@@ -88,9 +104,13 @@ def _paso(nombre: str, muestra: bool) -> dict:
     return {"paso": nombre, "estado": "ok", "detalle": detalle}
 
 
-def _ejecutar_pasos(muestra: bool = False) -> list[dict]:
-    """Ejecuta, en orden, los pasos que ya existen y anota los que llegan despues."""
-    pasos = []
+def _ejecutar_pasos(muestra: bool = False, llm: bool = False) -> list[dict]:
+    """Ejecuta, en orden, los pasos que ya existen y anota los que llegan despues.
+
+    Con `llm`, primero deja listo el LLM local: si falla, los demas pasos siguen y las
+    explicaciones usan la plantilla.
+    """
+    pasos = [_paso("llm", False)] if llm else []  # El LLM no depende de la muestra.
     for paso in PASOS:
         if paso not in PASOS_FUTUROS:
             pasos.append(_paso(paso, muestra))
@@ -148,6 +168,9 @@ def _analizador() -> argparse.ArgumentParser:
         )
     for paso, fase in PASOS_FUTUROS.items():
         comandos.add_parser(paso, help=f"Disponible desde la fase {fase}")
+    comandos.add_parser(
+        "llm", help="Descarga y precarga el modelo del LLM local (perfil llm de Compose)"
+    )
     comandos.add_parser("evidencia", help="Reune los archivos de evidencia")
     todo = comandos.add_parser("todo", help="Ejecuta todos los pasos y termina con evidencia")
     todo.add_argument(
@@ -156,6 +179,9 @@ def _analizador() -> argparse.ArgumentParser:
         help="No reunir evidencia al final (lo usa ./fraude, que la reune despues)",
     )
     todo.add_argument("--muestra", action="store_true", help=ayuda_muestra)
+    todo.add_argument(
+        "--llm", action="store_true", help="Prepara antes el LLM local para las explicaciones"
+    )
     return analizador
 
 
@@ -170,9 +196,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if opciones.comando in PASOS:
         return 0 if _paso(opciones.comando, opciones.muestra)["estado"] == "ok" else 1
+    if opciones.comando == "llm":
+        return 0 if _paso("llm", False)["estado"] == "ok" else 1
     if opciones.comando == "evidencia":
         return _evidencia(_pasos_guardados())
-    pasos = _ejecutar_pasos(opciones.muestra)
+    pasos = _ejecutar_pasos(opciones.muestra, opciones.llm)
     if opciones.sin_evidencia:
         return 1 if any(p["estado"] == "fallo" for p in pasos) else 0
     return _evidencia(pasos)

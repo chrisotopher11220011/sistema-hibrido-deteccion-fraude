@@ -60,6 +60,16 @@ def demostrar_falso(error=None):
     return PasoFalso(respuesta, error)
 
 
+def llm_falso(error=None):
+    respuesta = {
+        "estado": "ok",
+        "servidor": {"url": "http://llm:11434", "version": "0.40.16"},
+        "modelo": {"nombre": "qwen3.5:4b-q4_K_M"},
+        "ejecucion": "grafica",
+    }
+    return PasoFalso(respuesta, error)
+
+
 @pytest.fixture
 def raiz(tmp_path, monkeypatch):
     monkeypatch.setenv("FRAUDE_RAIZ", str(tmp_path))
@@ -68,6 +78,7 @@ def raiz(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "entrenar", entrenar_falso())
     monkeypatch.setattr(cli, "evaluar", evaluar_falso())
     monkeypatch.setattr(cli, "demostrar", demostrar_falso())
+    monkeypatch.setattr(cli, "preparar_llm", llm_falso())
     return tmp_path
 
 
@@ -231,3 +242,42 @@ def test_preparar_entrenar_y_evaluar_de_verdad_con_la_muestra(tmp_path, monkeypa
     for nombre in ("modelo.json", "metricas.json", "comparativa.md"):
         assert (en_curso / nombre).is_file()
     assert json.loads((en_curso / "metricas.json").read_text())["reportable"] is False
+
+
+# --- LLM local (fase 7) ---------------------------------------------------------------------
+
+
+def test_llm_suelto_prepara_el_modelo(raiz, capsys):
+    assert cli.main(["llm"]) == 0
+    salida = capsys.readouterr().out
+    assert "qwen3.5:4b-q4_K_M" in salida and "grafica" in salida
+
+
+def test_llm_suelto_que_falla_devuelve_uno(raiz, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "preparar_llm", llm_falso(RuntimeError("sin red")))
+    assert cli.main(["llm"]) == 1
+    assert "sin red" in capsys.readouterr().out
+
+
+def test_todo_con_llm_lo_prepara_primero(raiz, monkeypatch):
+    monkeypatch.setattr(cli, "comprobar_servicios", servicios())
+    assert cli.main(["todo", "--llm", "--sin-evidencia"]) == 0
+    pasos = json.loads((raiz / "resultados" / "en_curso" / "pasos.json").read_text())
+    assert [p["paso"] for p in pasos] == ["llm", "preparar", "entrenar", "evaluar", "demostrar"]
+
+
+def test_todo_sin_llm_no_lo_toca(raiz, monkeypatch):
+    llamado = llm_falso()
+    monkeypatch.setattr(cli, "preparar_llm", llamado)
+    assert cli.main(["todo", "--sin-evidencia"]) == 0
+    assert llamado.llamadas == []
+    pasos = json.loads((raiz / "resultados" / "en_curso" / "pasos.json").read_text())
+    assert "llm" not in [p["paso"] for p in pasos]
+
+
+def test_si_el_llm_falla_todo_sigue_con_la_plantilla(raiz, monkeypatch):
+    monkeypatch.setattr(cli, "preparar_llm", llm_falso(RuntimeError("sin red")))
+    assert cli.main(["todo", "--llm", "--sin-evidencia"]) == 1
+    pasos = json.loads((raiz / "resultados" / "en_curso" / "pasos.json").read_text())
+    assert [p["estado"] for p in pasos] == ["fallo", "ok", "ok", "ok", "ok"]
+    assert "plantilla" in pasos[0]["detalle"]

@@ -37,6 +37,7 @@ ARCHIVOS = (
     "revisiones.csv",
     "flujo.json",
     "simulacion.json",
+    "explicaciones.json",
 )
 FIGURAS = {
     "comparativa_prueba.png",

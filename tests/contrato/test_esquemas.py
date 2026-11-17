@@ -18,6 +18,8 @@ ESPERADOS = {
     "salud",
     "error_flujo",
     "lote",
+    "redaccion_pedida",
+    "redaccion",
 }
 NIVELES = yaml.safe_load((RAIZ / "config" / "decision.yaml").read_text())["niveles"]
 
@@ -226,3 +228,81 @@ def test_error_flujo_de_revision_no_registrada():
 
     error = {"tipo": "revision_no_registrada", "mensaje": "sin respuesta", "detalles": []}
     assert cumple("error_flujo", {"id_transaccion": None, "error": error})
+
+
+# --- Explicacion con LLM (fase 7, ADR 0016) ---------------------------------------------
+
+RESPALDO = {
+    "motivo": "comprobacion_fallida",
+    "detalle": "El texto no paso la comprobacion: nivel_no_mencionado",
+    "modelo": "qwen3.5:4b-q4_K_M",
+    "duracion_ms": 812.5,
+    "texto_descartado": "Texto del modelo",
+}
+
+
+def test_explicacion_del_caso_admite_respaldo_y_comprobacion():
+    llm = {
+        "texto": "Alerta prioritaria: se activo MONTO_ALTO.",
+        "origen": "llm",
+        "modelo": "qwen3.5:4b-q4_K_M",
+        "duracion_ms": 640.0,
+        "respaldo": None,
+        "comprobacion": {"valida": True, "fallos": []},
+    }
+    validar("caso_nuevo", _caso_nuevo(explicacion=llm))
+    plantilla = {
+        "texto": "El sistema senala esta transaccion para revision prioritaria.",
+        "origen": "plantilla",
+        "modelo": None,
+        "duracion_ms": None,
+        "respaldo": RESPALDO,
+        "comprobacion": {"valida": False, "fallos": ["nivel_no_mencionado"]},
+    }
+    validar("caso_nuevo", _caso_nuevo(explicacion=plantilla))
+    n8n = {**plantilla, "respaldo": {"motivo": "error_api", "detalle": "ECONNREFUSED"}}
+    validar("caso_nuevo", _caso_nuevo(explicacion=n8n))
+    otro = {**plantilla, "respaldo": {**RESPALDO, "motivo": "inventado"}}
+    assert not cumple("caso_nuevo", _caso_nuevo(explicacion=otro))
+
+
+def test_redaccion_del_modelo_y_de_respaldo():
+    validar(
+        "redaccion",
+        {
+            "origen": "llm",
+            "texto": "Alerta prioritaria: se activo MONTO_ALTO.",
+            "modelo": "qwen3.5:4b-q4_K_M",
+            "duracion_ms": 640.0,
+            "respaldo": None,
+            "comprobacion": {"valida": True, "fallos": []},
+        },
+    )
+    respaldo = {
+        "origen": "plantilla",
+        "texto": None,
+        "modelo": None,
+        "duracion_ms": None,
+        "respaldo": RESPALDO,
+        "comprobacion": {"valida": False, "fallos": ["nivel_no_mencionado"]},
+    }
+    validar("redaccion", respaldo)
+    # Un texto del modelo que no paso la comprobacion nunca sale como `llm`.
+    assert not cumple("redaccion", {**respaldo, "origen": "llm", "texto": "x", "respaldo": None})
+    # La plantilla siempre dice por que.
+    assert not cumple("redaccion", {**respaldo, "respaldo": None})
+    assert not cumple("redaccion", {**respaldo, "texto": "texto"})
+
+
+def test_redaccion_pedida(ejemplos):
+    validar(
+        "redaccion_pedida",
+        {"id_transaccion": "t-1", "nivel": "alerta_prioritaria", "senales": ejemplos["evaluacion"]},
+    )
+    error = {"id_transaccion": None, "nivel": "error_evaluacion", "senales": None}
+    validar("redaccion_pedida", error)
+    assert not cumple("redaccion_pedida", {**error, "nivel": "alerta_prioritaria"})
+    assert not cumple(
+        "redaccion_pedida",
+        {"nivel": "alerta_prioritaria", "senales": ejemplos["evaluacion"], "Class": 1},
+    )

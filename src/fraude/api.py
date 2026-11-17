@@ -16,8 +16,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
-from fraude import __version__, simulacion
-from fraude.casos import CasoNuevo, Revision
+from fraude import __version__, explicacion, simulacion
+from fraude.casos import CasoNuevo, RedaccionPedida, Revision
 from fraude.configuracion import cargar
 from fraude.errores import (
     ErrorApi,
@@ -49,11 +49,13 @@ def crear_app(
     modo_modelo: str | None = None,
     url_n8n: str | None = None,
     pedir_n8n=None,
+    llm_activo: bool | None = None,
 ) -> FastAPI:
     """API sobre `raiz`. `modo_modelo`: `auto`, `real` o `muestra` (`FRAUDE_MODELO`).
 
     `url_n8n` (`FRAUDE_URL_N8N`) y `pedir_n8n` son para las rutas de la pagina; `pedir_n8n`
-    sustituye la peticion HTTP en las pruebas.
+    sustituye la peticion HTTP en las pruebas. `llm_activo` (por defecto, `FRAUDE_LLM`)
+    decide si `POST /explicacion` llama al LLM local (ADR 0016).
     """
     raiz = Path(raiz) if raiz is not None else _raiz_por_defecto()
     servicio = ServicioModelo(raiz, modo_modelo or os.environ.get("FRAUDE_MODELO", "auto"))
@@ -121,6 +123,16 @@ def crear_app(
             registro_api.exception("Fallo al evaluar %s", id_t)
             mensaje = f"No se pudo evaluar la transaccion: {error}"
             raise ErrorApi("error_interno", mensaje, id_transaccion=id_t) from error
+
+    @app.post("/explicacion")
+    def redactar_explicacion(pedido: RedaccionPedida) -> dict:
+        """Explicacion de una alerta por el LLM local, o motivo para usar la plantilla.
+
+        No decide ni cambia el nivel: lo recibe ya decidido por n8n (ADR 0016).
+        """
+        activo = explicacion.llm_activo() if llm_activo is None else llm_activo
+        senales = pedido.senales.model_dump(mode="json") if pedido.senales else None
+        return explicacion.redactar(pedido.nivel, senales, cargar(raiz, "llm"), activo=activo)
 
     @app.post("/casos", status_code=201)
     def crear_caso(caso: CasoNuevo) -> dict:

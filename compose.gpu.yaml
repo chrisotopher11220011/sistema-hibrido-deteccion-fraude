@@ -1,0 +1,13 @@
+# Grafica NVIDIA para el LLM local (docs/spec.md, seccion 14; ADR 0016).
+# No se usa a mano: ./fraude todo --llm lo anade solo si `nvidia-smi` responde y Docker tiene
+# el entorno `nvidia` (preparacion unica en EJECUTAR.md, seccion «LLM local»). Sin el, Ollama
+# usa el procesador.
+services:
+  llm:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -175,3 +175,54 @@ jobs:
           path: resultados/
           if-no-files-found: warn
           retention-days: 14
+
+  llm-local:
+    name: LLM local (Ollama real en el procesador)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # La imagen de Ollama pesa unos 3,4 GB comprimida: se libera espacio del ejecutor.
+      - name: Espacio en disco para la imagen de Ollama
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      # En la CI no hay grafica y el modelo fijado (4B) seria lento en el procesador. Se usa
+      # uno diminuto de la misma familia: prueba el camino completo, no la calidad del texto.
+      - name: Modelo diminuto para la CI (no el fijado)
+        run: |
+          sed -i 's/^modelo: .*/modelo: qwen3.5:0.8b/; s/^resumen_modelo: .*/resumen_modelo: 6a061203ed02/' config/llm.yaml
+          grep -E '^(modelo|resumen_modelo|tiempo_limite_s):' config/llm.yaml
+
+      - name: ./fraude todo --muestra --llm (sin grafica, en el procesador)
+        run: ./fraude todo --muestra --llm
+
+      - name: Explicaciones con el LLM, paridad y comprobacion automatica
+        run: python3 tests/punta_a_punta/comprobar_llm.py
+
+      - name: La API responde con el LLM activo y lo usa
+        run: |
+          docker compose exec -T api python -c "import os; assert os.environ['FRAUDE_LLM'] == 'activo'"
+          docker compose ps
+
+      - name: ./fraude apagar detiene tambien el LLM
+        run: |
+          ./fraude apagar
+          test -z "$(docker compose --profile llm ps -q)"
+
+      - name: Registros si algo fallo
+        if: failure()
+        run: |
+          docker compose --profile llm ps --all || true
+          docker compose --profile llm logs --no-color --tail 300 || true
+
+      - name: Subir la evidencia
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencia-llm
+          path: resultados/
+          if-no-files-found: warn
+          retention-days: 14

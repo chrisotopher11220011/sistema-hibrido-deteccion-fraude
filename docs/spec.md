@@ -1,6 +1,6 @@
 # Archivo maestro: detección híbrida de fraude con reglas, aprendizaje automático y n8n
 
-- **Versión del documento:** 1.1 (2026-11-16). Añade Omarchy 4 como sistema de ejecución, el protocolo de rigor científico y el nivel de calidad de la interfaz.
+- **Versión del documento:** 1.2 (2026-11-17). Fija el servidor y el modelo del LLM local y la ruta `POST /explicacion` (ADR 0016). La 1.1 añadió Omarchy 4, el protocolo de rigor científico y el nivel de calidad de la interfaz.
 - **Para quién:** cualquier chat de desarrollo de este proyecto. Con este archivo y el repositorio debe bastar para trabajar sin preguntar.
 - **Base:** la ponencia «Diseño de un sistema híbrido para la detección de fraude en transacciones financieras…» y la guía «Ingeniería de software asistida por IA», ambas en este proyecto.
 - **Copia que manda:** este archivo, `docs/spec.md` del repositorio.
@@ -137,13 +137,14 @@ Página de simulación (navegador)
 | Reglas deterministas       <--------------- |                                     |
 | Isolation Forest (puntuación) ----------->  | 3. Clasificar nivel de alerta       |
 | Registro de casos (SQLite) <--------------- | 4. Registrar caso                   |
-+-----------------------------------+        | 5. Explicación (plantilla o LLM)    |
-                                             | 6. Notificación de prueba           |
-        LLM local (opcional) <--------------- | 7. Revisión humana (otro webhook)   |
-                                             +-------------------------------------+
+| Redacción de la explicación <-------------- | 5. Explicación (plantilla o LLM)    |
++-----------------------------------+        | 6. Notificación de prueba           |
+        |                                    | 7. Revisión humana (otro webhook)   |
+        v                                    +-------------------------------------+
+LLM local (opcional, servicio llm)
 ```
 
-La página nunca llama a n8n directamente: lo hace la API, para evitar problemas entre orígenes del navegador.
+La página nunca llama a n8n directamente: lo hace la API, para evitar problemas entre orígenes del navegador. Del mismo modo, el paso 5 de n8n pide la redacción a la API y la API habla con el LLM: así la comprobación del texto y sus parámetros viven en Python y en `config/` (ADR 0016).
 
 ## 8. Contratos
 
@@ -223,7 +224,7 @@ La tabla se aplica en n8n, en el nodo «Clasificar nivel», porque la ponencia s
 | `fecha_procesamiento` | UTC, ISO 8601 |
 | `senales` | Reglas y modelo tal como los devolvió `/evaluar` |
 | `puntuacion`, `nivel`, `razones` | Resultado y sus motivos en texto |
-| `explicacion` | Texto y `origen`: `plantilla` o `llm` |
+| `explicacion` | Texto y `origen`: `plantilla` o `llm`; además `modelo`, `duracion_ms` y, opcionales, `respaldo` (por qué se usó la plantilla) y `comprobacion` (sección 15). ADR 0016 |
 | `notificacion` | Canal y estado |
 | `estado` | `cerrado`, `pendiente_revision` o `revisado` |
 | `decision_final` | `sin_alerta`, `pendiente`, `sospecha_confirmada` o `sospecha_descartada` |
@@ -239,6 +240,7 @@ Los casos `sin_alerta` se cierran solos. Los demás niveles quedan en `pendiente
 | `GET /salud` | Estado del servicio y del modelo |
 | `POST /evaluar` | Señales de una transacción |
 | `POST /casos`, `GET /casos`, `POST /casos/{id}/revision` | Registro de casos |
+| `POST /explicacion` | Redacción de la explicación de una alerta por el LLM local, o motivo para usar la plantilla (ADR 0016) |
 | `GET /` | Página de simulación |
 | `GET /simulacion/lote` | Lote de demostración con etiqueta real, solo para mostrarla en la página |
 | `POST /simulacion/transacciones` | Reenvía una transacción al webhook de n8n y devuelve el caso |
@@ -263,7 +265,8 @@ Quien ejecuta usa el guion `./fraude <comando>`, que por dentro llama a `docker 
 | `evaluar` | Calcula las métricas y los archivos de análisis de errores |
 | `demostrar` | Envía el lote de demostración por n8n; mide paridad y latencia |
 | `evidencia` | Reúne los archivos de la sección 16. Puede ejecutarse varias veces; cada vez deja una carpeta completa |
-| `todo` | Ejecuta todo lo anterior, en orden, y termina siempre con `evidencia`, aunque un paso falle |
+| `todo` | Ejecuta todo lo anterior, en orden, y termina siempre con `evidencia`, aunque un paso falle. Con `--llm`, antes ejecuta `llm` |
+| `llm` | Descarga y precarga el modelo del LLM local y deja `llm.json` (ADR 0016) |
 
 En cada fase, `todo` ejecuta los pasos que ya existen. Al terminar, `api` y `n8n` siguen en marcha para usar la página.
 
@@ -271,7 +274,7 @@ El guion `./fraude` añade tres comandos propios: `abrir` (abre la página en el
 
 ### 8.9 Configuración
 
-`config/reglas.yaml`, `config/modelo.yaml` y `config/decision.yaml`. Ningún umbral queda escrito dentro del código.
+`config/reglas.yaml`, `config/modelo.yaml`, `config/decision.yaml` y `config/llm.yaml` (fase 7). Ningún umbral queda escrito dentro del código.
 
 ## 9. Datos
 
@@ -385,13 +388,14 @@ La página es lo que verá el público del congreso. Se trata como un producto, 
 
 - **Qué hace:** redacta en dos o tres frases, para el revisor, por qué se generó la alerta, a partir de las señales ya calculadas.
 - **Qué no hace:** no decide, no cambia el nivel y no ve datos que el sistema no haya calculado.
-- **Dónde:** servicio `llm` del perfil `llm` de Compose, por ejemplo con Ollama, usando la gráfica si está disponible y el procesador si no. Se habla con él por una API compatible con OpenAI, con dirección y modelo configurables.
+- **Dónde:** servicio `llm` del perfil `llm` de Compose, usando la gráfica si está disponible y el procesador si no. Se habla con él por una API compatible con OpenAI, con dirección y modelo configurables en `config/llm.yaml`. n8n pide la redacción de cada alerta a `POST /explicacion` y la API llama al LLM (ADR 0016).
+- **Fijado en la fase 7 (2026-11-17):** Ollama 0.40.16 (`ollama/ollama:0.40.16`) y `qwen3.5:4b-q4_K_M` (3,3 GB). La gráfica se reserva en `compose.gpu.yaml`, que `./fraude` añade solo si Docker está preparado.
 - **Gráfica en Omarchy:** pide una preparación única con permisos de administrador: `sudo pacman -S nvidia-container-toolkit`, `sudo nvidia-ctk runtime configure --runtime=docker` y `sudo systemctl restart docker`. Quien construya lo verifica y lo deja en `EJECUTAR.md`.
 - **No se usan los modelos locales propios de Omarchy** (`omarchy agent local`): corren fuera de Compose y sus descargas son de decenas de GB.
 - **Modelo:** uno pequeño que quepa en 8 GB de VRAM, elegido y fijado al construir tras verificar el catálogo vigente.
-- **Respaldo:** si el LLM no está activo, falla o tarda más del tiempo límite, se usa la explicación por plantilla. El sistema funciona igual sin LLM.
-- **Trazabilidad:** cada explicación guarda su origen, el modelo y el tiempo que tardó.
-- **Activación:** `./fraude todo --llm`. La primera vez descarga el modelo, de varios GB.
+- **Respaldo:** si el LLM no está activo, falla, tarda más del tiempo límite (20 s) o su texto no pasa la comprobación automática de la sección 15, se usa la explicación por plantilla. Si la API no responde a n8n, también. El sistema funciona igual sin LLM.
+- **Trazabilidad:** cada explicación guarda su origen, el modelo y el tiempo que tardó, y si se usó la plantilla, el motivo.
+- **Activación:** `./fraude todo --llm`. La primera vez descarga la imagen de Ollama (unos 3,4 GB) y el modelo (unos 3,3 GB).
 
 ## 15. Evaluación y rigor científico
 
@@ -464,7 +468,8 @@ No se fijan metas numéricas. La ponencia no anticipa cifras y este archivo tamp
 | `flujo.json` | Niveles obtenidos por n8n, paridad, latencias y errores |
 | `casos.csv`, `revisiones.csv` | Casos registrados y decisiones de los revisores |
 | `simulacion.json` | Lo enviado desde la página y lo que respondió el sistema |
-| `explicaciones.json` | Muestra de explicaciones, su origen y sus tiempos |
+| `explicaciones.json` | Muestra de explicaciones, su origen y sus tiempos, motivos de respaldo y tasa de fallos de la comprobación automática |
+| `llm.json` | Solo con `--llm`: servidor, modelo, resumen y si corre en la gráfica o en el procesador |
 | `OBSERVACIONES.md` | Plantilla que llena el compañero: qué hizo, qué vio, qué le confundió, y el cuestionario SUS |
 | `capturas/` | Capturas de pantalla de la sesión |
 
@@ -574,6 +579,7 @@ Después:
   - 0009 LLM local opcional, solo para explicar
   - 0010 Guion `./fraude` y permisos de Docker en Omarchy 4
   - 0011 Protocolo de evaluación e incertidumbre
+  - Los siguientes los añade cada fase; la fase 7 añadió el 0016, LLM local con Ollama y redacción en la API
 
 ## 20. Reglas de trabajo para cada chat
 
@@ -693,7 +699,7 @@ A y B pueden saltarse para ir directo a C. A es barato y evita construir seis fa
 - Método de contribución por variable, tras verificar que admite `IsolationForest`.
 - Cómo consigue `./fraude` que los archivos queden a nombre del usuario.
 - Herramienta de capturas automáticas.
-- Servidor y modelo del LLM.
+- Servidor y modelo del LLM. *Decidido en la fase 7: Ollama 0.40.16 y `qwen3.5:4b-q4_K_M` (ADR 0016).*
 
 **Pendiente de Christopher**
 

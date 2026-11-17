@@ -99,6 +99,28 @@
             "null"
           ],
           "minimum": 0
+        },
+        "respaldo": {
+          "description": "Por qué se usó la plantilla, si se intentó o se descartó la redacción del LLM (ADR 0016)",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "urn:fraude:contratos:redaccion#/$defs/respaldo"
+            }
+          ]
+        },
+        "comprobacion": {
+          "description": "Comprobación automática del texto del LLM (sección 15)",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "urn:fraude:contratos:redaccion#/$defs/comprobacion"
+            }
+          ]
         }
       }
     },
