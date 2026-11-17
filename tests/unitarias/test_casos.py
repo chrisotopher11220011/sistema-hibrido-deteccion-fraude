@@ -236,3 +236,34 @@ def test_las_senales_se_guardan_tal_como_las_devolvio_evaluar(cliente):
 
     assert caso["senales"] == nuevo["senales"]
     assert cliente.get("/casos").json()["casos"][0]["senales"] == nuevo["senales"]
+
+
+@pytest.mark.parametrize(
+    ("ruta", "valor"),
+    [
+        (("senales", "modelo", "puntuacion"), "NaN"),
+        (("senales", "modelo", "umbral_revision"), "Infinity"),
+        (("monto",), True),
+        (("monto",), "1250"),
+        (("senales", "reglas", 0, "activada"), "si"),
+    ],
+)
+def test_caso_con_numeros_no_validos_se_rechaza(cliente, ruta, valor):
+    import json
+
+    nuevo = caso_nuevo(cliente)
+    nuevo["senales"]["modelo"].update(
+        {"evaluable": True, "puntuacion": 0.5, "umbral_revision": 0.4, "umbral_prioritaria": 0.6}
+    )
+    destino = nuevo
+    for clave in ruta[:-1]:
+        destino = destino[clave]
+    destino[ruta[-1]] = "__VALOR__"
+    cuerpo = json.dumps(nuevo).replace(
+        '"__VALOR__"', json.dumps(valor) if valor not in ("NaN", "Infinity") else valor
+    )
+
+    respuesta = cliente.post("/casos", content=cuerpo, headers={"content-type": "application/json"})
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert cliente.get("/casos").json()["total"] == 0

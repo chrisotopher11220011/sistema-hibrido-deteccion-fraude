@@ -6,13 +6,18 @@ completa `id_caso`, `estado`, `decision_final` y `revision` (y `fecha_procesamie
 confirma o descarta la sospecha.
 """
 
-import math
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 NIVELES = ("error_evaluacion", "alerta_prioritaria", "revision_recomendada", "sin_alerta")
 FECHA_UTC = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$"
+
+
+# Numero JSON finito: ni booleanos ni textos convertidos, ni NaN ni infinitos (que se
+# guardarian como null y alterarian el caso sin aviso).
+Numero = Annotated[float, Field(strict=True, allow_inf_nan=False)]
+Logico = Annotated[bool, Field(strict=True)]
 
 
 class _Estricto(BaseModel):
@@ -24,24 +29,24 @@ class _Estricto(BaseModel):
 
 class Regla(_Estricto):
     id: str = Field(min_length=1)
-    evaluable: bool
-    activada: bool
-    alto_riesgo: bool
+    evaluable: Logico
+    activada: Logico
+    alto_riesgo: Logico
     razon: str = Field(min_length=1)
 
 
 class Contribucion(_Estricto):
     variable: str
-    peso: float
+    peso: Numero
 
 
 class SenalModelo(_Estricto):
-    evaluable: bool
-    puntuacion: float | None
-    umbral_revision: float | None
-    umbral_prioritaria: float | None
-    anomalia: bool
-    anomalia_alta: bool
+    evaluable: Logico
+    puntuacion: Numero | None
+    umbral_revision: Numero | None
+    umbral_prioritaria: Numero | None
+    anomalia: Logico
+    anomalia_alta: Logico
     contribuciones: list[Contribucion] | None = None
 
 
@@ -64,7 +69,7 @@ class Explicacion(_Estricto):
     texto: str
     origen: Literal["plantilla", "llm"]
     modelo: str | None = None
-    duracion_ms: float | None = Field(default=None, ge=0)
+    duracion_ms: Annotated[Numero, Field(ge=0)] | None = None
 
 
 class Notificacion(_Estricto):
@@ -82,22 +87,15 @@ class VersionesCaso(_Estricto):
 class CasoNuevo(_Estricto):
     id_transaccion: str | None = Field(default=None, max_length=100)
     origen: Literal["original", "sintetico"] | None = None
-    monto: float | None = None
+    monto: Numero | None = None
     fecha_procesamiento: str | None = Field(default=None, pattern=FECHA_UTC)
     senales: Senales | None = None
-    puntuacion: float | None = None
+    puntuacion: Numero | None = None
     nivel: Literal[NIVELES]
     razones: list[str]
     explicacion: Explicacion
     notificacion: Notificacion
     versiones: VersionesCaso
-
-    @field_validator("monto", "puntuacion")
-    @classmethod
-    def _finito(cls, valor: float | None) -> float | None:
-        if valor is not None and not math.isfinite(valor):
-            raise ValueError("debe ser un numero finito")
-        return valor
 
     @field_validator("razones")
     @classmethod

@@ -4,7 +4,7 @@ La etiqueta real (`Class`) nunca viaja en la transaccion: cualquier campo extra 
 """
 
 import math
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -14,8 +14,8 @@ VARIABLES = tuple(f"V{i}" for i in range(1, 29))
 class Ubicacion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    pais_habitual: str = Field(pattern=r"^[A-Z]{2}$")
-    pais_transaccion: str = Field(pattern=r"^[A-Z]{2}$")
+    pais_habitual: str = Field(pattern=r"^[A-Z]{2}$", strict=True)
+    pais_transaccion: str = Field(pattern=r"^[A-Z]{2}$", strict=True)
 
 
 class Transaccion(BaseModel):
@@ -23,8 +23,9 @@ class Transaccion(BaseModel):
 
     id_transaccion: str = Field(min_length=1, max_length=100)
     origen: Literal["original", "sintetico"]
-    monto: float = Field(ge=0)
-    variables: dict[str, float] | None = None
+    # Estrictos: el contrato exige numeros JSON; un booleano o un texto no se convierten.
+    monto: float = Field(ge=0, strict=True)
+    variables: dict[str, Annotated[float, Field(strict=True)]] | None = None
     ubicacion: Ubicacion | None = None
 
     @field_validator("monto")

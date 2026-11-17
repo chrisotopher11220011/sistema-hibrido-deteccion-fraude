@@ -13,11 +13,19 @@ from typing import Literal
 
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException
 
 from fraude import __version__
 from fraude.casos import CasoNuevo, Revision
 from fraude.configuracion import cargar
-from fraude.errores import ErrorApi, detalles_validacion, id_del_cuerpo, respuesta_error
+from fraude.errores import (
+    ErrorApi,
+    cuerpo_error,
+    detalles_validacion,
+    id_del_cuerpo,
+    respuesta_error,
+)
 from fraude.evaluacion import ModeloNoDisponible, evaluar_transaccion
 from fraude.registro import CasoNoEncontrado, CasoYaRevisado, RegistroCasos, ruta_bd_casos
 from fraude.servicio_modelo import ServicioModelo
@@ -64,6 +72,17 @@ def crear_app(raiz: Path | None = None, modo_modelo: str | None = None) -> FastA
     @app.exception_handler(ErrorApi)
     async def _error_api(_: Request, error: ErrorApi):
         return respuesta_error(error.tipo, error.mensaje, error.detalles, error.id_transaccion)
+
+    @app.exception_handler(HTTPException)
+    async def _ruta_no_disponible(request: Request, error: HTTPException):
+        # Rutas inexistentes (404) o metodos no admitidos (405): mismo cuerpo de error, con
+        # el codigo HTTP original.
+        mensaje = f"{request.method} {request.url.path}: {error.detail}"
+        return JSONResponse(
+            status_code=error.status_code,
+            content=cuerpo_error("ruta_no_disponible", mensaje),
+            headers=getattr(error, "headers", None),
+        )
 
     @app.exception_handler(Exception)
     async def _error_interno(_: Request, error: Exception):

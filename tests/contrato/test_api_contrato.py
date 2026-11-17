@@ -1,7 +1,7 @@
 """Las respuestas reales de la API cumplen los esquemas de docs/contratos/."""
 
 import pytest
-from contratos import completar_variables, validar
+from contratos import completar_variables, cumple, validar
 from fastapi.testclient import TestClient
 
 from apoyo import variables_transaccion
@@ -86,3 +86,19 @@ def test_el_contrato_y_la_api_rechazan_lo_mismo(cliente, ejemplos):
         respuesta = cliente.post("/evaluar", json=t)
         assert respuesta.status_code == 422, t
         validar("error", respuesta.json())
+
+
+def test_rutas_desconocidas_y_tipos_no_numericos_cumplen_el_contrato(cliente, ejemplos):
+    base = completar_variables(ejemplos["transaccion"])
+    respuestas = [
+        cliente.get("/evaluar"),
+        cliente.get("/no-existe"),
+        cliente.post("/evaluar", json={**base, "monto": "1250"}),
+        cliente.post("/evaluar", json={**base, "monto": True}),
+    ]
+
+    assert [r.status_code for r in respuestas] == [405, 404, 422, 422]
+    for respuesta in respuestas:
+        validar("error", respuesta.json())
+    for t in ({**base, "monto": "1250"}, {**base, "monto": True}):
+        assert not cumple("transaccion", t)

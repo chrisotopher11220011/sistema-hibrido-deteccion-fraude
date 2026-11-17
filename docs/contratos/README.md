@@ -19,7 +19,8 @@ Cada esquema tiene un `$id` de la forma `urn:fraude:contratos:<nombre>`; `caso` 
 
 La sección 8 fija la transacción, la respuesta de `/evaluar`, los niveles y los campos del caso. Lo que dejaba abierto se decidió en la fase 4 (ADR 0013):
 
-- **Errores.** `{"id_transaccion": …, "error": {"tipo", "mensaje", "detalles"}}`. Tipos y códigos: `entrada_invalida` (422), `modelo_no_disponible` (503), `error_interno` (500), `caso_no_encontrado` (404) y `caso_ya_revisado` (409). En `POST /evaluar`, **cualquier** respuesta que no sea 200 (o la falta de respuesta) significa que la evaluación falló: n8n marca el caso `error_evaluacion` y lo deja pendiente de revisión, nunca `sin_alerta`.
+- **Errores.** `{"id_transaccion": …, "error": {"tipo", "mensaje", "detalles"}}`. Tipos y códigos: `entrada_invalida` (422), `modelo_no_disponible` (503), `error_interno` (500), `caso_no_encontrado` (404), `caso_ya_revisado` (409) y `ruta_no_disponible` (404 o 405). En `POST /evaluar`, **cualquier** respuesta que no sea 200 (o la falta de respuesta) significa que la evaluación falló: n8n marca el caso `error_evaluacion` y lo deja pendiente de revisión, nunca `sin_alerta`.
+- **Tipos.** Los números deben ser números JSON finitos: `"1500"` o `true` en `monto` son entrada inválida, igual que en el esquema.
 - **Modelo no disponible.** Si la transacción trae `variables` y la API no tiene modelo cargado, responde 503. Si no las trae, el modelo no hacía falta: responde 200 con `modelo.evaluable: false`, `puntuacion: null` y `versiones.modelo: null` si no hay modelo.
 - **Casos.** n8n envía el caso sin `id_caso`, `estado`, `decision_final` ni `revision`: los pone la API. Un caso `sin_alerta` queda `cerrado`; los demás, `pendiente_revision` con `decision_final: pendiente`. Toda alerta lleva al menos una razón.
 

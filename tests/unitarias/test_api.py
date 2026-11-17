@@ -189,3 +189,38 @@ def test_fallo_interno_tiene_cuerpo_de_error(raiz_api):
     assert respuesta.status_code == 500
     assert respuesta.json()["id_transaccion"] == "s-1"
     assert respuesta.json()["error"]["tipo"] == "error_interno"
+
+
+@pytest.mark.parametrize(
+    "cambio",
+    [
+        {"monto": True},
+        {"monto": "1500"},
+        {"variables": {**variables_transaccion(), "V1": True}},
+        {"variables": {**variables_transaccion(), "V1": "2.5"}},
+        {"ubicacion": {"pais_habitual": "EC", "pais_transaccion": 1}},
+    ],
+)
+def test_tipos_que_el_contrato_no_admite_son_entrada_invalida(raiz_api, cambio):
+    # El contrato exige numeros JSON: nada de convertir booleanos o textos (revision de codigo).
+    t = {**_original(), **cambio}
+
+    respuesta = _cliente(raiz_api).post("/evaluar", json=t)
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert respuesta.json()["error"]["tipo"] == "entrada_invalida"
+
+
+def test_monto_entero_sigue_siendo_valido(raiz_api):
+    t = {"id_transaccion": "t-e", "origen": "original", "monto": 1500}
+
+    assert _cliente(raiz_api).post("/evaluar", json=t).status_code == 200
+
+
+@pytest.mark.parametrize(("metodo", "ruta"), [("GET", "/evaluar"), ("GET", "/no-existe")])
+def test_rutas_y_metodos_desconocidos_llevan_cuerpo_de_error(raiz_api, metodo, ruta):
+    respuesta = _cliente(raiz_api).request(metodo, ruta)
+
+    assert respuesta.status_code in (404, 405)
+    assert respuesta.json()["error"]["tipo"] == "ruta_no_disponible"
+    assert respuesta.json()["id_transaccion"] is None

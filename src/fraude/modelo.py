@@ -11,6 +11,7 @@ La puntuacion prioriza la revision humana; no prueba el fraude.
 """
 
 import hashlib
+import io
 import json
 from pathlib import Path
 
@@ -98,6 +99,9 @@ def cargar_artefacto(carpeta: Path) -> tuple[IsolationForest, dict]:
     if not ruta.is_file() or not ruta_meta.is_file():
         raise ErrorModelo("No hay modelo entrenado. Ejecuta antes el paso entrenar.")
     meta = json.loads(ruta_meta.read_text(encoding="utf-8"))
-    if _sha256(ruta) != meta.get("huella_artefacto"):
+    # Una sola lectura: se carga exactamente lo que se comprobo, aunque `entrenar` reescriba el
+    # archivo mientras tanto.
+    contenido = ruta.read_bytes()
+    if hashlib.sha256(contenido).hexdigest() != meta.get("huella_artefacto"):
         raise ErrorModelo("El archivo del modelo no coincide con su modelo.json: repite entrenar.")
-    return joblib.load(ruta), meta
+    return joblib.load(io.BytesIO(contenido)), meta

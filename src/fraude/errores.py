@@ -13,6 +13,7 @@ CODIGOS = {
     "error_interno": 500,
     "caso_no_encontrado": 404,
     "caso_ya_revisado": 409,
+    "ruta_no_disponible": 404,
 }
 
 
