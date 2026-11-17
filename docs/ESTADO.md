@@ -3,8 +3,8 @@
 Documento vivo. Cada chat lo lee al empezar y lo actualiza al cerrar.
 
 - **Última actualización:** 2026-11-17 (UTC)
-- **Versión integrada en `main`:** 0.2.0 (Pull Request #3).
-- **Etiquetas `v0.1.0` y `v0.2.0`:** **pendientes**. El entorno de Claude no puede crear etiquetas; las crea Christopher desde GitHub (*Releases > Draft a new release*): `v0.1.0` sobre el commit `54c0be4` y `v0.2.0` sobre el commit de integración del Pull Request #3.
+- **Versión integrada en `main`:** 0.2.0 (Pull Request #3, commit `0a20cd8`).
+- **Etiquetas `v0.1.0` y `v0.2.0`:** **pendientes**. El entorno de Claude no puede crear etiquetas; las crea Christopher desde GitHub (*Releases > Draft a new release*): `v0.1.0` sobre el commit `54c0be4` y `v0.2.0` sobre el commit `0a20cd8`.
 - **Fase en curso:** ninguna. La fase 2 está terminada; sigue la fase 3.
 - **Punto de prueba pendiente:** **A** (Omarchy 4). Con la versión 0.2.0 además descarga y prepara los datos reales, así que adelanta parte del punto B. Puede saltarse.
 
