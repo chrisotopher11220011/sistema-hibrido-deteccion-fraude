@@ -1,0 +1,224 @@
+{
+  "id": "FraudeRevision01",
+  "name": "Revisión humana",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "revision",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "4be0a624-d590-587a-877d-42fbe035973b",
+      "name": "Webhook revisión",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "4f9d1dc8-defc-5292-a023-1db4dfb9193a"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cedcd62f-d984-53de-8109-2b00a0d2b2fc",
+              "name": "id_caso_valido",
+              "type": "boolean",
+              "value": "={{ $json.body !== null && typeof $json.body === 'object' && !Array.isArray($json.body) && typeof $json.body.id_caso === 'string' && /^c-[0-9a-f]{12}$/.test($json.body.id_caso) }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "086c5993-ff88-510f-9d61-13b90bb8eb40",
+      "name": "Validar revisión",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7a9f32e5-8a6e-586a-b0c6-4ee5d08f2931",
+              "leftValue": "={{ $json.id_caso_valido }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "989657cb-09a3-54a5-90c3-88bf9fffefbd",
+      "name": "¿Caso válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://api:8000/casos/{{ encodeURIComponent($json.body.id_caso) }}/revision",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.parse(JSON.stringify({ decision: $json.body.decision, revisor: $json.body.revisor, comentario: $json.body.comentario })) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "611ef13a-f135-5044-a12a-de82b611546b",
+      "name": "Guardar revisión",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        100
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "dc02967c-1ee4-5d40-97aa-867addb3e3cf",
+      "name": "Responder con la API",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { id_transaccion: null, error: { tipo: 'revision_no_registrada', mensaje: 'POST /casos/{id}/revision no respondió: ' + (typeof $json.error === 'string' ? $json.error : (($json.error || {}).message || 'sin detalle')), detalles: [] } } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "id": "b430f7d7-88c0-575a-9730-3fa5efb1ba45",
+      "name": "Responder: revisión no registrada",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { id_transaccion: null, error: { tipo: 'entrada_invalida', mensaje: 'id_caso debe ser un texto con la forma c- y 12 cifras hexadecimales (minúsculas)', detalles: [] } } }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "id": "eec7071b-e274-5a89-b42e-9c243a558c95",
+      "name": "Responder: id_caso inválido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        350
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook revisión": {
+      "main": [
+        [
+          {
+            "node": "Validar revisión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar revisión": {
+      "main": [
+        [
+          {
+            "node": "¿Caso válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Caso válido?": {
+      "main": [
+        [
+          {
+            "node": "Guardar revisión",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: id_caso inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar revisión": {
+      "main": [
+        [
+          {
+            "node": "Responder con la API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: revisión no registrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
