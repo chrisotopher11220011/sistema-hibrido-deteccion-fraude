@@ -25,15 +25,29 @@ if [ "$1" = "compose" ]; then
         *" version "*) echo "5.0.0"; exit 0 ;;
         *" up "*) [ -n "${FALSO_UP_FALLA:-}" ] && exit 1; exit 0 ;;
         *" logs "*) echo "registro de ${!#} TELEGRAM_TOKEN=abc"; exit 0 ;;
+        *" tareas todo"*)
+            stat -c %u "$FALSO_RAIZ/resultados/en_curso" > "$FALSO_RAIZ/dueno_al_ejecutar.txt"
+            exit 0 ;;
         *" tareas evidencia"*)
-            mkdir -p "$FALSO_RAIZ/resultados/20260101T000000Z_falso"
+            [ -n "${FALSO_EVIDENCIA_FALLA:-}" ] && exit 1
+            carpeta="$FALSO_RAIZ/resultados/20260101T000000Z_falso"
+            [ -d "$carpeta" ] && carpeta="$FALSO_RAIZ/resultados/20260101T$(date +%H%M%S%N)Z_falso"
+            mkdir -p "$carpeta"
             echo "uid=${FRAUDE_UID:-} gid=${FRAUDE_GID:-}" \
                 > "$FALSO_RAIZ/resultados/entorno_visto.txt"
+            : > "$carpeta.zip"
             exit 0 ;;
     esac
 fi
 exit 0
 """
+
+SS_FALSO = r"""#!/bin/bash
+[ -n "${FALSO_PUERTO_OCUPADO:-}" ] && echo "LISTEN 0 4096 127.0.0.1:8000 0.0.0.0:*"
+exit 0
+"""
+
+OMARCHY_FALSO = "#!/bin/bash\nprintf '\\033[32m4.0.3\\033[0m\\n'\n"
 
 SUDO_FALSO = r"""#!/bin/bash
 echo "sudo $*" >> "$FALSO_REGISTRO"
@@ -60,6 +74,8 @@ class Guion:
             ("docker", DOCKER_FALSO),
             ("sudo", SUDO_FALSO),
             ("xdg-open", ABRIR_FALSO),
+            ("ss", SS_FALSO),
+            ("omarchy-version", OMARCHY_FALSO),
         ):
             (simulados / nombre).write_text(texto)
             (simulados / nombre).chmod(0o755)
@@ -264,3 +280,36 @@ def test_lanzado_con_sudo_devuelve_los_archivos_a_la_persona(guion):
     anfitrion = json.loads((guion.en_curso() / "anfitrion.json").read_text())
     assert anfitrion["modo_docker"] == "root"
     assert anfitrion["usuario"] == {"uid": 1234, "gid": 1234}
+
+
+@solo_root
+def test_lanzado_con_sudo_las_carpetas_ya_son_de_la_persona_al_llamar_a_los_contenedores(guion):
+    guion.ejecutar("todo", SUDO_UID="1234", SUDO_GID="1234")
+
+    assert (guion.proyecto / "dueno_al_ejecutar.txt").read_text().strip() == "1234"
+
+
+def test_si_la_evidencia_falla_no_anuncia_una_carpeta_anterior(guion):
+    guion.ejecutar("todo")
+
+    resultado = guion.ejecutar("evidencia", FALSO_EVIDENCIA_FALLA="1")
+
+    assert resultado.returncode != 0
+    assert "Evidencia lista" not in resultado.stdout
+    assert "resultados/en_curso" in resultado.stderr
+
+
+def test_anfitrion_conserva_los_puertos_ocupados_antes_de_arrancar(guion):
+    guion.ejecutar("todo", FALSO_PUERTO_OCUPADO="1")
+    guion.ejecutar("evidencia")
+
+    puertos = json.loads((guion.en_curso() / "anfitrion.json").read_text())["puertos"]
+    assert "8000" in puertos["en_escucha_antes_de_arrancar"]
+    assert puertos["en_escucha_ahora"] == ""
+
+
+def test_anfitrion_sigue_siendo_json_si_una_orden_devuelve_colores(guion):
+    guion.ejecutar("evidencia")
+
+    anfitrion = json.loads((guion.en_curso() / "anfitrion.json").read_text())
+    assert anfitrion["omarchy"] == {"version": "4.0.3", "obtenida_de": "omarchy-version"}

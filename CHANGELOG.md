@@ -6,7 +6,7 @@ Cada entrada indica su nivel de verificación: N1 (entorno de desarrollo), N2 (G
 
 ## [Sin publicar]
 
-## [0.1.0] - 2026-11-16
+## [0.1.0] - 2026-11-17
 
 Fase 1, cimientos. Sin datos, reglas, modelo ni página todavía: esta versión solo comprueba que el sistema arranca.
 

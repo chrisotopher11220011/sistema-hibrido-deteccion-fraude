@@ -1,6 +1,6 @@
 # Supuestos y su estado
 
-Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por cierto sin haberlo visto en el computador de ejecución y cómo se comprobará. Estados: **pendiente**, **confirmado** o **refutado**. Solo la evidencia de una ejecución N3 confirma o refuta.
+Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por cierto sin haberlo visto en el computador de ejecución y cómo se comprobará. Estados: **pendiente**, **confirmado** o **refutado**. Solo la evidencia de una ejecución N3 confirma o refuta, salvo S10, que es un supuesto sobre N2.
 
 - **Última actualización:** 2026-11-17 (UTC), al cerrar la fase 1.
 - **Evidencia N3 recibida hasta hoy:** ninguna.
@@ -8,7 +8,7 @@ Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por 
 | N.º | Supuesto | Cómo se comprueba | Estado | Notas |
 |---|---|---|---|---|
 | S1 | Docker y Docker Compose están instalados y en marcha en Omarchy 4 | `anfitrion.json` | Pendiente | El manual de Omarchy lo afirma (leído el 2026-11-16) |
-| S2 | Los puertos 5678 y 8000 están libres | Arranque; `anfitrion.json` anota los que ya estaban en escucha | Pendiente | Se cambian con `FRAUDE_PUERTO_API` y `FRAUDE_PUERTO_N8N` |
+| S2 | Los puertos 5678 y 8000 están libres | Arranque; `anfitrion.json` anota los que ya estaban en escucha antes de arrancar | Pendiente | Se cambian con `FRAUDE_PUERTO_API` y `FRAUDE_PUERTO_N8N` |
 | S3 | OpenML responde y entrega el mismo conjunto que Kaggle | `datos.json`: 284.807 filas y 492 fraudes | Pendiente | Fase 2 |
 | S4 | La versión fijada de n8n importa y activa los flujos sin pasos manuales | N2 y, en N3, `RESUMEN.md` y `registros/n8n.log` | Pendiente | **Comprobado en N2** con n8n 2.47.7, también en un segundo arranque con el volumen ya creado. Falta N3 |
 | S5 | El entrenamiento termina en minutos | `modelo.json` | Pendiente | Fase 3 |

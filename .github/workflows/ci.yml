@@ -95,6 +95,13 @@ jobs:
           sudo ./fraude evidencia
           python3 tests/punta_a_punta/comprobar_evidencia.py --con-anfitrion
 
+      - name: sudo ./fraude todo desde cero tampoco deja archivos de root
+        run: |
+          ./fraude apagar
+          rm -rf resultados/en_curso resultados/2*
+          sudo ./fraude todo
+          python3 tests/punta_a_punta/comprobar_evidencia.py --con-anfitrion
+
       - name: ./fraude apagar
         run: |
           ./fraude apagar

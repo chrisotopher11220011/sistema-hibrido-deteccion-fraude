@@ -115,6 +115,7 @@ compose() {
 
 tareas() {
     local opciones=(--rm)
+    devolver_propiedad
     [ -t 1 ] || opciones+=(-T)
     compose run "${opciones[@]}" "$@"
 }
@@ -127,7 +128,7 @@ preparar_carpetas() {
 }
 
 nueva_sesion() {
-    rm -rf "$EN_CURSO/registros" "$EN_CURSO/capturas" "$EN_CURSO/pasos.json"
+    rm -rf "$EN_CURSO/registros" "$EN_CURSO/capturas" "$EN_CURSO/pasos.json" "$EN_CURSO/.puertos_antes"
     if [ -f "$EN_CURSO/OBSERVACIONES.md" ]; then
         mkdir -p "$EN_CURSO/anteriores"
         mv "$EN_CURSO/OBSERVACIONES.md" "$EN_CURSO/anteriores/OBSERVACIONES-$(date -u +%Y%m%dT%H%M%SZ).md"
@@ -144,8 +145,18 @@ devolver_propiedad() {
 }
 trap devolver_propiedad EXIT
 
+# Lo que ya escuchaba en los puertos del proyecto (supuesto S2).
+puertos_en_escucha() {
+    command -v ss >/dev/null 2>&1 || { printf 'no consultado (falta ss)'; return 0; }
+    ss -ltnH 2>/dev/null | awk '{print $4}' | grep -E ":(${PUERTO_API}|${PUERTO_N8N})\$" | tr '\n' ' '
+}
+
+# Quita secuencias de color y caracteres de control, que romperian el JSON.
+limpiar() { sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | tr -d '\000-\010\013-\037'; }
+
 json_cadena() {
-    local texto="$1"
+    local texto
+    texto="$(printf '%s' "$1" | limpiar)"
     texto="${texto//\\/\\\\}"
     texto="${texto//\"/\\\"}"
     texto="${texto//$'\n'/\\n}"
@@ -159,7 +170,7 @@ primera_linea() { "$@" 2>/dev/null | head -n 1; }
 recoger_anfitrion() {
     local omarchy="" origen_omarchy="no detectado" sistema="" nucleo docker_motor compose_version
     local grafica="" origen_grafica="no detectada" nvidia_en_docker="false" cortafuegos memoria_mb=""
-    local procesador="" nucleos="" disco_libre_gb="" uso_sudo="false" puertos=""
+    local procesador="" nucleos="" disco_libre_gb="" uso_sudo="false" puertos="" puertos_antes=""
 
     if command -v omarchy-version >/dev/null 2>&1; then
         omarchy="$(primera_linea omarchy-version)"; origen_omarchy="omarchy-version"
@@ -193,6 +204,7 @@ recoger_anfitrion() {
     else
         cortafuegos="no consultado (hace falta sudo)"
     fi
+    [ -n "$cortafuegos" ] || cortafuegos="no consultado (sudo pidio de nuevo la contrasena o ufw no respondio)"
     if [ -r /proc/meminfo ]; then
         memoria_mb="$(awk '/^MemTotal:/ {print int($2/1024)}' /proc/meminfo)"
     fi
@@ -201,9 +213,9 @@ recoger_anfitrion() {
     fi
     nucleos="$(nproc 2>/dev/null)"
     disco_libre_gb="$(df -Pk "$RAIZ" 2>/dev/null | awk 'NR==2 {print int($4/1048576)}')"
-    if command -v ss >/dev/null 2>&1; then
-        puertos="$(ss -ltnH 2>/dev/null | awk '{print $4}' | grep -E ":(${PUERTO_API}|${PUERTO_N8N})\$" | tr '\n' ' ')"
-    fi
+    puertos="$(puertos_en_escucha)"
+    puertos_antes="no registrado (los servicios no se arrancaron con ./fraude todo)"
+    [ -f "$EN_CURSO/.puertos_antes" ] && puertos_antes="$(cat "$EN_CURSO/.puertos_antes")"
     [ "$MODO_DOCKER" = "sudo" ] && uso_sudo="true"
 
     cat > "$EN_CURSO/anfitrion.json" <<FIN
@@ -222,7 +234,7 @@ recoger_anfitrion() {
   "nucleos": ${nucleos:-null},
   "memoria_mb": ${memoria_mb:-null},
   "disco_libre_gb": ${disco_libre_gb:-null},
-  "puertos": {"api": $PUERTO_API, "n8n": $PUERTO_N8N, "en_escucha": $(json_cadena "$puertos")}
+  "puertos": {"api": $PUERTO_API, "n8n": $PUERTO_N8N, "en_escucha_antes_de_arrancar": $(json_cadena "$puertos_antes"), "en_escucha_ahora": $(json_cadena "$puertos")}
 }
 FIN
 }
@@ -259,7 +271,8 @@ ultima_evidencia() {
 # --- Comandos ---------------------------------------------------------------
 
 reunir_evidencia() {
-    local codigo=0 carpeta
+    local codigo=0 carpeta anterior
+    anterior="$(ultima_evidencia)"
     decir "Reuniendo la evidencia..."
     guardar_registros
     copiar_capturas
@@ -267,11 +280,12 @@ reunir_evidencia() {
     # --no-deps: la evidencia debe salir aunque un servicio este caido.
     tareas --no-deps tareas evidencia || codigo=$?
     carpeta="$(ultima_evidencia)"
-    if [ -n "$carpeta" ]; then
+    if [ -n "$carpeta" ] && [ "$carpeta" != "$anterior" ] && [ -f "$RAIZ/resultados/$carpeta.zip" ]; then
         decir "Evidencia lista: resultados/$carpeta/ y resultados/$carpeta.zip"
         decir "Eso es lo que hay que devolver (la carpeta o el .zip)."
     else
-        fallar "No se creo la carpeta de evidencia. Envia lo que haya en resultados/en_curso/."
+        fallar "No se pudo completar la carpeta de evidencia."
+        fallar "Envia tal cual la carpeta resultados/en_curso/ (ahi estan los registros)."
         [ "$codigo" -eq 0 ] && codigo=1
     fi
     return "$codigo"
@@ -290,6 +304,11 @@ cmd_todo() {
     detectar_docker || return 1
     preparar_carpetas
     nueva_sesion
+    if compose ps -q 2>/dev/null | grep -q .; then
+        printf 'no registrado (los servicios del proyecto ya estaban en marcha)' > "$EN_CURSO/.puertos_antes"
+    else
+        puertos_en_escucha > "$EN_CURSO/.puertos_antes"
+    fi
     recoger_anfitrion
 
     decir "Paso 1 de 3: construir y arrancar los servicios (api y n8n)."

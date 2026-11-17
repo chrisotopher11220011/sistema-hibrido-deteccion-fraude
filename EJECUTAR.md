@@ -87,8 +87,8 @@ Si quieres, haz una captura con `Print Screen`. Se guarda sola en `~/Pictures/Sc
 |---|---|
 | `No pude obtener permisos con sudo` | Vuelve a ejecutar `./fraude todo` y escribe tu contraseña de usuario |
 | `Docker no responde ni con sudo` | `sudo systemctl start docker` y repite |
-| Un mensaje de que el puerto 8000 o 5678 ya está en uso | Usa otros puertos: `FRAUDE_PUERTO_API=8010 FRAUDE_PUERTO_N8N=5690 ./fraude todo` |
-| Se queda mucho tiempo en el paso 1 | La primera descarga depende de tu conexión. Si pasan siete minutos sin que n8n responda, el guion lo da por fallido y guarda los registros |
+| Un mensaje de que el puerto 8000 o 5678 ya está en uso | Usa otros puertos. Escribe una vez `export FRAUDE_PUERTO_API=8010 FRAUDE_PUERTO_N8N=5690` y, en esa misma terminal, repite `./fraude todo`. Las demás órdenes (`estado`, `abrir`, `evidencia`, `apagar`) deben ejecutarse en esa misma terminal |
+| Se queda mucho tiempo en el paso 1 | La primera descarga depende de tu conexión. Si n8n no responde pasados entre cuatro y siete minutos, el guion lo da por fallido y guarda los registros |
 | Cualquier otro `ERROR` | Ejecuta `./fraude evidencia` y envía el `.zip`. Con eso basta para diagnosticarlo |
 
 Ejecutar `./fraude todo` varias veces no rompe nada. Para volver a empezar de cero: `./fraude apagar` y de nuevo `./fraude todo`.
