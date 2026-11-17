@@ -17,7 +17,7 @@ Documento vivo. Cada chat lo lee al empezar y lo actualiza al cerrar.
 | 3. Aprendizaje automático | v0.3.0 | Terminada (N1 y N2 con la muestra). Las métricas reales esperan el punto B (N3) | #5 |
 | 4. API y casos | v0.4.0 | Terminada (N1 y N2 con la muestra), pendiente de integrar. Sin punto de prueba propio | #7 (abierto) |
 | 5. Flujos de n8n | v0.5.0 | Terminada: paridad 124/124 en N2 con la muestra. Sin punto de prueba propio | #8 (abierto, sobre #7) |
-| 6. Página de simulación | v0.6.0 | Terminada: capturas revisadas en N2, axe-core sin violaciones y pruebas en verde con la muestra. Espera el punto C | #9 (abierto, sobre #8) |
+| 6. Página de simulación | v0.6.0 | Terminada ([CI](https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/actions/runs/44144074191)): capturas revisadas en N2, axe-core sin violaciones y pruebas en verde con la muestra. Espera el punto C | #9 (abierto, sobre #8) |
 | 7. LLM local (opcional) | v0.7.0 | Sin empezar | |
 | 8. Mejora con evidencia | v0.8.x | Sin empezar | |
 | 9. Cierre | v1.0.0 | Sin empezar | |

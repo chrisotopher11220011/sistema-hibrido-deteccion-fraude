@@ -3,7 +3,7 @@
 - **Versión revisada:** 0.6.0 (fase 6).
 - **Qué se revisa:** la página de `web/`, servida por `api` en `http://localhost:8000`.
 - **Con qué:** las pautas de interacción humano-IA de Amershi et al. (2019), la accesibilidad WCAG 2.2 nivel AA y el cuestionario SUS.
-- **Nivel de verificación:** N1 y N2 con la muestra para pruebas. La experiencia de una persona real (SUS, observaciones, Chrome de Omarchy) espera el punto de prueba C (N3).
+- **Nivel de verificación:** N1 y N2 con la muestra para pruebas ([ejecución de la CI](https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/actions/runs/44144074191)). La experiencia de una persona real (SUS, observaciones, Chrome de Omarchy) espera el punto de prueba C (N3).
 
 ## 1. Pautas de interacción humano-IA
 
@@ -69,3 +69,4 @@ Revisión de las capturas de la fase 6, en N1 y N2, y lo que se corrigió:
 | Las etiquetas de los umbrales se cortaban a la derecha y se tapaban cuando los dos umbrales coinciden (pasa con la muestra) | Margen derecho mayor, etiquetas en una línea y apiladas sin taparse |
 | En modo presentación la letra de las gráficas no crecía | Las gráficas escalan su letra y sus márgenes con la de la página |
 | La comprobación de lenguaje marcaba el propio aviso («no confirma fraude») | La comprobación admite la negación |
+| Con un error antes de la primera transacción, el estado decía «pulsa Continuar simulación» pero el botón decía «Iniciar simulación» | Los mensajes nombran el botón tal como se ve |
