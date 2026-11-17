@@ -1,8 +1,11 @@
 import json
+import shutil
 import zipfile
 from datetime import UTC, datetime
 
+from apoyo import RAIZ_REPO
 from fraude import evidencia
+from fraude.registro import RegistroCasos, ruta_bd_casos
 
 AHORA = datetime(2026, 11, 16, 20, 30, 0, tzinfo=UTC)
 SERVICIOS_BIEN = [
@@ -16,6 +19,7 @@ ESPERADOS = {
     "version.json",
     "errores.json",
     "OBSERVACIONES.md",
+    "explicaciones.json",
 }
 
 
@@ -504,3 +508,146 @@ def test_simulacion_no_cuenta_los_intentos_sin_respuesta_del_flujo(tmp_path):
     assert sesion["sin_respuesta_del_flujo"] == 1
     assert sesion["comparacion"]["sin_veredicto"] == 0
     assert sesion["comparacion"]["cualquier_alerta"]["vp"] == 1
+
+
+# --- Explicaciones y LLM local (fase 7) -----------------------------------------------------
+
+
+def _senales_alerta():
+    return {
+        "id_transaccion": "t-1",
+        "reglas": [
+            {"id": "MONTO_ALTO", "evaluable": True, "activada": True,
+             "alto_riesgo": False, "razon": "El monto supera el umbral"},
+            {"id": "MONTO_ALTO_UBICACION_INUSUAL", "evaluable": False, "activada": False,
+             "alto_riesgo": True, "razon": "No evaluable"},
+        ],
+        "modelo": {"evaluable": True, "puntuacion": 0.8, "umbral_revision": 0.62,
+                   "umbral_prioritaria": 0.74, "anomalia": True, "anomalia_alta": True,
+                   "contribuciones": [{"variable": "V14", "peso": 0.2}]},
+        "versiones": {"reglas": "0.2.0", "modelo": "m"},
+    }  # fmt: skip
+
+
+def _registrar_explicaciones(raiz):
+    shutil.copytree(RAIZ_REPO / "config", raiz / "config", dirs_exist_ok=True)
+    registro = RegistroCasos(ruta_bd_casos(raiz))
+    base = {
+        "id_transaccion": "t-1",
+        "origen": "original",
+        "monto": 1250.0,
+        "senales": _senales_alerta(),
+        "puntuacion": 0.8,
+        "nivel": "alerta_prioritaria",
+        "razones": ["MONTO_ALTO: El monto supera el umbral"],
+        "notificacion": {"canal": "simulada", "estado": "simulada_enviada"},
+        "versiones": {"reglas": "0.2.0", "modelo": "m", "flujo": "transaccion-0.7.0"},
+    }
+    plantilla = "El sistema señala esta transacción para revisión prioritaria."
+    respaldo = {"modelo": None, "duracion_ms": None, "texto_descartado": None}
+    explicaciones = [
+        {"texto": "Alerta prioritaria: se activó MONTO_ALTO y pesó V14. Debe revisarse.",
+         "origen": "llm", "modelo": "qwen3.5:4b-q4_K_M", "duracion_ms": 800.0,
+         "respaldo": None, "comprobacion": {"valida": True, "fallos": []}},
+        {"texto": "Alerta prioritaria: se activó MONTO_ALTO. Una persona la revisa.",
+         "origen": "llm", "modelo": "qwen3.5:4b-q4_K_M", "duracion_ms": 1200.0,
+         "respaldo": None, "comprobacion": {"valida": True, "fallos": []}},
+        {"texto": plantilla, "origen": "plantilla", "modelo": None, "duracion_ms": None,
+         "respaldo": {**respaldo, "motivo": "comprobacion_fallida", "detalle": "afirmacion",
+                      "modelo": "qwen3.5:4b-q4_K_M", "duracion_ms": 900.0,
+                      "texto_descartado": "Es fraude. TOKEN=secreto1"},
+         "comprobacion": {"valida": False, "fallos": ["afirmacion_prohibida:es fraude"]}},
+        {"texto": plantilla, "origen": "plantilla", "modelo": None, "duracion_ms": None,
+         "respaldo": {**respaldo, "motivo": "tiempo_agotado", "detalle": "20 s",
+                      "modelo": "qwen3.5:4b-q4_K_M", "duracion_ms": 20000.0},
+         "comprobacion": None},
+        {"texto": plantilla, "origen": "plantilla", "modelo": None, "duracion_ms": None,
+         "respaldo": {**respaldo, "motivo": "error_api", "detalle": "ECONNREFUSED"},
+         "comprobacion": None},
+    ]  # fmt: skip
+    for e in explicaciones:
+        registro.crear({**base, "explicacion": e})
+    registro.crear(
+        {**base, "nivel": "sin_alerta", "razones": [],
+         "explicacion": {"texto": "Ninguna señal superó su umbral.", "origen": "plantilla"}}
+    )  # fmt: skip
+
+
+def test_explicaciones_json_con_origen_respaldos_tiempos_y_comprobacion(tmp_path):
+    _registrar_explicaciones(tmp_path)
+    carpeta = reunir(tmp_path)
+    contenido = json.loads((carpeta / "explicaciones.json").read_text())
+    assert contenido["total"] == 6
+    assert contenido["por_origen"] == {"llm": 2, "plantilla": 4}
+    assert contenido["respaldos"] == {
+        "comprobacion_fallida": 1,
+        "error_api": 1,
+        "sin_respaldo": 1,
+        "tiempo_agotado": 1,
+    }
+    assert contenido["intentos_llm"] == 4
+    comprobacion = contenido["comprobacion"]
+    assert comprobacion["textos_comprobados"] == 3
+    assert comprobacion["fallidos"] == 1
+    assert comprobacion["tasa_fallos"] == round(1 / 3, 4)
+    assert comprobacion["por_fallo"] == {"afirmacion_prohibida": 1}
+    # La comprobacion se repite sobre lo guardado: las aceptadas siguen siendo validas.
+    assert comprobacion["recomprobacion"] == {"aceptadas": 2, "siguen_validas": 2, "discrepan": []}
+    tiempos = contenido["tiempos_ms"]["llm"]
+    assert tiempos["n"] == 2 and tiempos["mediana"] == 1000.0 and tiempos["maximo"] == 1200.0
+    assert contenido["tiempos_ms"]["intentos"]["n"] == 4
+    texto = json.dumps(contenido)
+    assert "secreto1" not in texto
+    assert len(contenido["muestra"]) == 5
+    resumen = (carpeta / "RESUMEN.md").read_text()
+    assert "2 por el LLM" in resumen and "1 de 3" in resumen
+
+
+def test_explicacion_aceptada_que_ya_no_pasa_la_comprobacion_se_senala(tmp_path):
+    _registrar_explicaciones(tmp_path)
+    ruta = tmp_path / "config" / "llm.yaml"
+    ruta.write_text(ruta.read_text().replace("alerta_prioritaria: alerta prioritaria",
+                                             "alerta_prioritaria: alerta máxima"))  # fmt: skip
+    contenido = json.loads((reunir(tmp_path) / "explicaciones.json").read_text())
+    recomprobacion = contenido["comprobacion"]["recomprobacion"]
+    assert recomprobacion["siguen_validas"] == 0
+    assert len(recomprobacion["discrepan"]) == 2
+
+
+def test_sin_casos_explicaciones_json_lo_dice(tmp_path):
+    carpeta = reunir(tmp_path)
+    contenido = json.loads((carpeta / "explicaciones.json").read_text())
+    assert contenido["total"] == 0 and contenido["estado"] == "sin_casos"
+
+
+def test_casos_csv_lleva_modelo_tiempo_y_respaldo_de_la_explicacion(tmp_path):
+    _registrar_explicaciones(tmp_path)
+    casos = _leer_csv(reunir(tmp_path) / "casos.csv")
+    por_respaldo = {c["explicacion_respaldo"] for c in casos}
+    assert {"", "comprobacion_fallida", "tiempo_agotado", "error_api"} <= por_respaldo
+    llm = [c for c in casos if c["explicacion_origen"] == "llm"]
+    assert {c["explicacion_modelo"] for c in llm} == {"qwen3.5:4b-q4_K_M"}
+    assert {c["explicacion_duracion_ms"] for c in llm} == {"800.0", "1200.0"}
+
+
+def test_copia_llm_json_y_lo_resume(tmp_path):
+    en_curso = tmp_path / "resultados" / "en_curso"
+    en_curso.mkdir(parents=True)
+    llm = {
+        "estado": "ok",
+        "servidor": {"url": "http://llm:11434", "version": "0.40.16"},
+        "modelo": {"nombre": "qwen3.5:4b-q4_K_M", "coincide_con_el_fijado": True},
+        "ejecucion": "grafica",
+        "memoria": {"fraccion_en_grafica": 1.0},
+    }
+    (en_curso / "llm.json").write_text(json.dumps(llm))
+    carpeta = reunir(tmp_path)
+    assert json.loads((carpeta / "llm.json").read_text()) == llm
+    assert json.loads((carpeta / "explicaciones.json").read_text())["servidor"] == llm
+    resumen = (carpeta / "RESUMEN.md").read_text()
+    assert "LLM local: qwen3.5:4b-q4_K_M en Ollama 0.40.16, en la grafica" in resumen
+
+
+def test_sin_llm_lo_anota(tmp_path):
+    resumen = (reunir(tmp_path) / "RESUMEN.md").read_text()
+    assert "Sin LLM local" in resumen

@@ -108,3 +108,85 @@ class ServidorLlm:
     def cerrar(self):
         self.http.shutdown()
         self.http.server_close()
+
+
+class OllamaFalso:
+    """Imita la API nativa de Ollama que usa `tareas llm`: version, pull, generate, ps, tags.
+
+    `pull_falla` responde un error en la descarga; `en_grafica` decide `size_vram`.
+    """
+
+    def __init__(self, en_grafica: bool = True, pull_falla: bool = False):
+        self.en_grafica = en_grafica
+        self.pull_falla = pull_falla
+        self.recibidos: list[tuple[str, str, dict | None]] = []
+        falso = self
+
+        class Manejador(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def _json(self, contenido, codigo=200):
+                cuerpo = json.dumps(contenido).encode()
+                self.send_response(codigo)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(cuerpo)))
+                self.end_headers()
+                self.wfile.write(cuerpo)
+
+            def do_GET(self):
+                falso.recibidos.append(("GET", self.path, None))
+                tamano = 3_300_000_000
+                if self.path == "/api/version":
+                    self._json({"version": "0.40.16"})
+                elif self.path == "/api/ps":
+                    self._json({"models": [{
+                        "name": "qwen3.5:4b-q4_K_M", "model": "qwen3.5:4b-q4_K_M",
+                        "size": tamano, "size_vram": tamano if falso.en_grafica else 0,
+                        "digest": "d8b0f5e9760c" + "0" * 52,
+                    }]})  # fmt: skip
+                elif self.path == "/api/tags":
+                    self._json({"models": [{
+                        "name": "qwen3.5:4b-q4_K_M", "size": tamano,
+                        "digest": "d8b0f5e9760c" + "0" * 52,
+                    }]})  # fmt: skip
+                else:
+                    self._json({"error": "no existe"}, 404)
+
+            def do_POST(self):
+                largo = int(self.headers.get("Content-Length", 0))
+                cuerpo = json.loads(self.rfile.read(largo) or b"{}")
+                falso.recibidos.append(("POST", self.path, cuerpo))
+                if self.path == "/api/pull":
+                    if falso.pull_falla:
+                        self._json({"error": "pull model manifest: file does not exist"}, 500)
+                        return
+                    lineas = [
+                        {"status": "pulling manifest"},
+                        {"status": "pulling d8b0", "digest": "sha256:d8b0", "total": 1000,
+                         "completed": 0},
+                        {"status": "pulling d8b0", "digest": "sha256:d8b0", "total": 1000,
+                         "completed": 500},
+                        {"status": "pulling d8b0", "digest": "sha256:d8b0", "total": 1000,
+                         "completed": 1000},
+                        {"status": "verifying sha256 digest"},
+                        {"status": "success"},
+                    ]  # fmt: skip
+                    datos = "".join(json.dumps(linea) + "\n" for linea in lineas).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/x-ndjson")
+                    self.send_header("Content-Length", str(len(datos)))
+                    self.end_headers()
+                    self.wfile.write(datos)
+                elif self.path == "/api/generate":
+                    self._json({"model": cuerpo.get("model"), "response": "", "done": True})
+                else:
+                    self._json({"error": "no existe"}, 404)
+
+        self.http = ThreadingHTTPServer(("127.0.0.1", 0), Manejador)
+        self.url = f"http://127.0.0.1:{self.http.server_address[1]}"
+        threading.Thread(target=self.http.serve_forever, daemon=True).start()
+
+    def cerrar(self):
+        self.http.shutdown()
+        self.http.server_close()
