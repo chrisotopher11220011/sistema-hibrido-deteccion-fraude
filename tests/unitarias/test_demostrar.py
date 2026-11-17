@@ -110,7 +110,7 @@ def test_paridad_total_y_flujo_json(raiz):
     assert sum(flujo["niveles_n8n"].values()) == total
     assert flujo["niveles_n8n"] == flujo["niveles_python"]
     assert flujo["niveles_n8n"]["error_evaluacion"] == flujo["lote"]["por_tipo"]["invalida"]
-    assert flujo["latencia_ms"]["n"] == total
+    assert flujo["latencia_ms_todas"]["n"] == total
     assert 0 <= flujo["latencia_ms"]["mediana"] <= flujo["latencia_ms"]["p95"]
     assert flujo["latencia_ms"]["p95"] <= flujo["latencia_ms"]["maxima"]
     assert flujo["errores"] == []
@@ -213,3 +213,29 @@ def test_urls_por_defecto_salen_del_entorno(raiz, monkeypatch):
     monkeypatch.setenv("FRAUDE_URL_N8N", N8N)
     informe = paso.demostrar(raiz, muestra=True, pedir=Servicios(raiz))
     assert informe["servicios"] == {"api": API, "n8n": N8N}
+
+
+def test_validas_en_error_evaluacion_hacen_fallar_aunque_haya_paridad(raiz):
+    """Sin modelo, las originales dan 503 por los dos caminos: paridad trivial, no vale."""
+
+    class SinModelo(Servicios):
+        def _evaluar(self, cuerpo):
+            if isinstance(cuerpo, dict) and "variables" in cuerpo:
+                return 503, {"error": {"tipo": "modelo_no_disponible"}}
+            return super()._evaluar(cuerpo)
+
+    with pytest.raises(paso.ErrorDemostracion, match="error_evaluacion"):
+        paso.demostrar(raiz, muestra=True, url_api=API, url_n8n=N8N, pedir=SinModelo(raiz))
+    flujo = _flujo(raiz)
+    assert flujo["estado"] == "fallo"
+    assert flujo["paridad"]["completa"] is True
+    assert flujo["cobertura"]["validas_en_error"] == flujo["lote"]["por_tipo"]["original"]
+
+
+def test_la_latencia_solo_cuenta_las_transacciones_validas(raiz):
+    paso.demostrar(raiz, muestra=True, url_api=API, url_n8n=N8N, pedir=Servicios(raiz))
+    flujo = _flujo(raiz)
+    por_tipo = flujo["lote"]["por_tipo"]
+    assert flujo["latencia_ms"]["n"] == por_tipo["original"] + por_tipo["sintetico"]
+    assert flujo["latencia_ms_todas"]["n"] == flujo["lote"]["total"]
+    assert flujo["cobertura"]["niveles_no_error"] >= 1

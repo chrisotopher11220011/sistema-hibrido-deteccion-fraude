@@ -97,7 +97,7 @@ Las que la especificación dejaba «para quien construya»:
 | Caso no registrado | 502 con el caso calculado (`error_flujo`) | `docs/contratos/` |
 | Notificación | Simulada, escrita en el caso. Telegram no se construyó | ADR 0014 |
 | Lote de demostración | Parte de prueba (20 fraudes como máximo y 80 no fraudes), 20 sintéticas y 6 inválidas, con semilla | `config/modelo.yaml`, `src/fraude/lote.py` |
-| Latencia | Desde `tareas` hasta la respuesta del webhook; mediana y p95 con interpolación lineal | `src/fraude/demostrar.py` |
+| Latencia | Transacciones válidas, desde `tareas` hasta la respuesta del webhook; mediana y p95 con interpolación lineal. `demostrar` falla si una válida termina en `error_evaluacion` (paridad sin cobertura) | `src/fraude/demostrar.py` |
 
 ## Límites del entorno de Claude (comprobados el 2026-11-17, fase 5)
 

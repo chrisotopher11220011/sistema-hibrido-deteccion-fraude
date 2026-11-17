@@ -27,7 +27,7 @@ La sección 8 fija la transacción, la respuesta de `/evaluar`, los niveles y lo
 
 ## Respuestas de los webhooks de n8n (ADR 0014)
 
-- **`POST /webhook/transaccion`** recibe una transacción (sección 8.2) y responde **200 con el caso registrado** (esquema `caso`), también cuando el nivel es `error_evaluacion`. Si la API no guarda el caso, responde **502** con `error_flujo`: `error.tipo = caso_no_registrado` y el caso calculado en `caso`.
+- **`POST /webhook/transaccion`** recibe una transacción (sección 8.2) y responde **200 con el caso registrado** (esquema `caso`), también cuando el nivel es `error_evaluacion`. Si la API no guarda el caso, responde **502** con `error_flujo`: `error.tipo = caso_no_registrado` y el caso calculado en `caso`. Un cuerpo que no es JSON válido lo rechaza n8n con 422 antes de ejecutar el flujo y no deja caso.
 - **`POST /webhook/revision`** recibe `{"id_caso", "decision", "revisor", "comentario"}`. Si `id_caso` no tiene la forma `c-` y 12 cifras hexadecimales, responde **422** (esquema `error`) sin llamar a la API. Si no, repite el código y el cuerpo de `POST /casos/{id}/revision` (200, 404, 409, 422). Si la API no responde, **502** con `error_flujo` (`revision_no_registrada`).
 
 ## Pruebas

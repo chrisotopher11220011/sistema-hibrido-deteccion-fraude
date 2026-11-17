@@ -71,7 +71,10 @@ def _nivel_python(codigo: int, evaluacion) -> str:
     return clasificar(evaluacion["reglas"], evaluacion["modelo"])
 
 
-def _latencias(valores: list[float]) -> dict:
+VALIDAS = ("original", "sintetico")
+
+
+def _latencias(valores: list[float], medida: str) -> dict:
     if not valores:
         return {"n": 0, "mediana": None, "p95": None, "maxima": None}
     arreglo = np.asarray(valores)
@@ -81,7 +84,7 @@ def _latencias(valores: list[float]) -> dict:
         "p95": round(float(np.percentile(arreglo, 95)), 1),
         "maxima": round(float(arreglo.max()), 1),
         "metodo": "percentiles con interpolacion lineal (numpy)",
-        "medida": "desde tareas hasta la respuesta del webhook; incluye /evaluar y /casos",
+        "medida": medida,
     }
 
 
@@ -197,8 +200,25 @@ def demostrar(
             niveles_n8n=dict(Counter(c["nivel_n8n"] for c in casos if c["nivel_n8n"])),
             niveles_python=dict(Counter(c["nivel_python"] for c in casos if c["nivel_python"])),
             latencia_ms=_latencias(
-                [c["latencia_ms"] for c in casos if c["latencia_ms"] is not None]
+                [
+                    c["latencia_ms"]
+                    for c in casos
+                    if c["tipo"] in VALIDAS and c["latencia_ms"] is not None
+                ],
+                "transacciones validas del lote (originales y sinteticas), desde tareas hasta "
+                "la respuesta del webhook; incluye /evaluar y /casos",
             ),
+            latencia_ms_todas=_latencias(
+                [c["latencia_ms"] for c in casos if c["latencia_ms"] is not None],
+                "todo el lote, incluidas las entradas invalidas que n8n rechaza sin llamar a "
+                "la API",
+            ),
+            cobertura={
+                "niveles_no_error": len({c["nivel_n8n"] for c in casos} - {None, ERROR}),
+                "validas_en_error": sum(
+                    1 for c in casos if c["tipo"] in VALIDAS and c["nivel_n8n"] == ERROR
+                ),
+            },
             coherencia=_coherencia(casos),
             errores=[{"n": c["n"], "detalle": c["error"]} for c in casos if c["error"]],
             casos=casos,
@@ -206,6 +226,13 @@ def demostrar(
         problemas = []
         if discrepancias:
             problemas.append(f"paridad incompleta: {len(discrepancias)} de {len(casos)} distintos")
+        validas_en_error = informe["cobertura"]["validas_en_error"]
+        if validas_en_error:
+            # Una transaccion valida no deberia fallar: la paridad seria trivial (ADR 0014).
+            problemas.append(
+                f"{validas_en_error} transacciones validas terminaron en error_evaluacion "
+                "(¿la API tiene el modelo cargado?)"
+            )
         if informe["coherencia"]["incoherentes"]:
             problemas.append("hay casos cuyo estado no corresponde a su nivel")
         sin_registro = [c["n"] for c in casos if c["nivel_n8n"] and not c["id_caso"]]

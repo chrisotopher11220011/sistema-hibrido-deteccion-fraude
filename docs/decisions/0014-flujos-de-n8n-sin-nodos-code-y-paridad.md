@@ -20,7 +20,7 @@ Todo lo que depende de la versión se verificó en el código de n8n en la etiqu
 
 **Simulador en N1.** `tests/n8n/simulador.mjs` ejecuta ese subconjunto de nodos con la semántica comprobada en el código de n8n (primera regla del Switch, salida de error con la entrada más `error`, reintentos acotados, expresiones que cierran en el primer `}}`). Con él, las pruebas recorren todas las combinaciones de señales contra `decision.clasificar` y todas las ramas de error con respuestas de la API simuladas. Es más estricto que n8n (tipos exactos, nada fuera del subconjunto). La prueba definitiva es N2.
 
-**Validación en n8n.** Cuerpo objeto, `id_transaccion` texto de 1 a 100 caracteres, `origen` conocido, `monto` número finito ≥ 0 y sin `Class`. Es un subconjunto de la validación de la API: si n8n rechazara algo que la API acepta, los dos caminos de la paridad darían niveles distintos. Lo demás lo rechaza la API con 422.
+**Validación en n8n.** Cuerpo objeto, `id_transaccion` texto de 1 a 100 caracteres, `origen` conocido, `monto` número finito ≥ 0 y sin `Class`. Es un subconjunto de la validación de la API: si n8n rechazara algo que la API acepta, los dos caminos de la paridad darían niveles distintos. Lo demás lo rechaza la API con 422. **Excepción:** un cuerpo que no es JSON válido no llega al flujo: n8n responde 422 antes de ejecutarlo (`packages/cli/src/middlewares/body-parser.ts` en `n8n@2.47.7`), así que no queda caso. La API de la página (fase 6) envía siempre JSON serializado; la CI comprueba que n8n responde un error y no registra nada.
 
 **Reintentos.** `/evaluar`: tiempo límite de 10 s y 3 intentos con 1 s entre ellos, solo ante errores de red o de tiempo; una respuesta distinta de 200 ya es la respuesta y lleva a `error_evaluacion` con su tipo y mensaje como razón. `/casos` y `/casos/{id}/revision` no se reintentan, para no duplicar casos ni revisiones.
 
@@ -32,7 +32,7 @@ Todo lo que depende de la versión se verificó en el código de n8n en la etiqu
 
 **Lote de demostración.** `datos/demostracion/lote.json` (o `datos/muestra/demostracion/lote.json`), con semilla y parámetros en `config/modelo.yaml` (`demostracion`): fraudes y no fraudes de la parte de **prueba**, las primeras sintéticas de ubicación y seis entradas inválidas fijas, una de ellas solo detectable por la API. La etiqueta real va en cada elemento, fuera de la transacción.
 
-**`demostrar`.** Cada elemento va por n8n (webhook) y por Python (`/evaluar` + `decision.clasificar`). Exige el mismo nivel en todos, que cada caso quede registrado y que su estado corresponda a su nivel. La latencia se mide desde `tareas` hasta la respuesta del webhook (incluye `/evaluar` y `/casos`): mediana y percentil 95 con interpolación lineal. Todo queda en `flujo.json`, también si falla.
+**`demostrar`.** Cada elemento va por n8n (webhook) y por Python (`/evaluar` + `decision.clasificar`). Exige el mismo nivel en todos, que cada caso quede registrado, que su estado corresponda a su nivel y que **ninguna transacción válida termine en `error_evaluacion`**: si la API no pudiera evaluar (por ejemplo, sin modelo), los dos caminos coincidirían en el error y la paridad no probaría la tabla. La latencia (`latencia_ms`) se mide sobre las transacciones válidas, desde `tareas` hasta la respuesta del webhook (incluye `/evaluar` y `/casos`): mediana y percentil 95 con interpolación lineal. `latencia_ms_todas` incluye las inválidas que n8n rechaza sin llamar a la API. Todo queda en `flujo.json`, también si falla.
 
 ## Consecuencias
 

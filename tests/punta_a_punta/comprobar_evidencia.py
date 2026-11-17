@@ -106,8 +106,11 @@ def main() -> int:
             paridad, lote = flujo["paridad"], flujo["lote"]
             if not (paridad["completa"] and paridad["coinciden"] == paridad["total"] > 0):
                 fallos.append(f"paridad incompleta: {paridad}")
-            if paridad["total"] != lote["total"] or flujo["latencia_ms"]["n"] != lote["total"]:
+            validas = lote["por_tipo"]["original"] + lote["por_tipo"]["sintetico"]
+            if paridad["total"] != lote["total"] or flujo["latencia_ms"]["n"] != validas:
                 fallos.append("flujo.json no cubre todo el lote")
+            if flujo["cobertura"]["validas_en_error"] or not flujo["cobertura"]["niveles_no_error"]:
+                fallos.append(f"paridad sin cobertura de la tabla: {flujo['cobertura']}")
             invalidas = lote["por_tipo"]["invalida"]
             if invalidas == 0 or flujo["niveles_n8n"].get("error_evaluacion", 0) < invalidas:
                 fallos.append("las entradas invalidas del lote no terminaron en error_evaluacion")

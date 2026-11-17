@@ -27,7 +27,10 @@ VERSION_FLUJO_PREFIJO = "transaccion-"
 
 
 def pedir(metodo: str, url: str, cuerpo=None, timeout: float = 90) -> tuple[int, object, float]:
-    datos = None if cuerpo is None else json.dumps(cuerpo).encode()
+    if isinstance(cuerpo, bytes):
+        datos = cuerpo  # cuerpo crudo, sin serializar
+    else:
+        datos = None if cuerpo is None else json.dumps(cuerpo).encode()
     peticion = urllib.request.Request(
         url, data=datos, method=metodo, headers={"content-type": "application/json"}
     )
@@ -100,6 +103,15 @@ def sin_modelo(exigir) -> None:
                 exigir(codigo_razon in caso["razones"][0], f"{nombre}: {caso['razones']}")
             else:
                 exigir(caso["razones"][0].startswith("Entrada inválida"), f"{nombre}: razon")
+
+    # JSON mal formado: n8n lo rechaza (422) antes de ejecutar el flujo, asi que no hay caso
+    # (ADR 0014). Se comprueba que responde un error y que no aparece ningun caso nuevo.
+    _, antes, _ = pedir("GET", f"{URL_API}/casos?limite=1")
+    codigo, respuesta, _ = pedir("POST", f"{URL_N8N}/webhook/transaccion", b'{"monto": 12,')
+    print(f"webhook/transaccion con JSON mal formado: {codigo} {str(respuesta)[:200]}")
+    exigir(400 <= codigo < 500, f"JSON mal formado: n8n respondio {codigo}")
+    _, despues, _ = pedir("GET", f"{URL_API}/casos?limite=1")
+    exigir(despues["total"] == antes["total"], "el JSON mal formado registro un caso")
 
     # Sinteticas: solo reglas, el modelo no hace falta.
     inusual = {
