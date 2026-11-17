@@ -1,0 +1,51 @@
+# LLM local opcional (docs/spec.md, seccion 14; ADR 0009 y 0016).
+# Solo redacta, para el revisor, la explicacion de una alerta a partir de las senales ya
+# calculadas. No decide ni cambia el nivel. Si no esta activo (./fraude todo sin --llm),
+# falla, tarda mas de `tiempo_limite_s` o su texto no pasa la comprobacion, se usa la
+# plantilla de n8n.
+
+servidor:
+  # Servicio `llm` de compose.yaml (perfil `llm`). API compatible con OpenAI en /v1 y la
+  # nativa de Ollama en /api (descarga y estado). Sin puerto publicado.
+  url: http://llm:11434
+
+# Fijado el 2026-11-17 tras revisar el catalogo de Ollama (ADR 0016): Qwen3.5 4B en Q4_K_M,
+# 3,3 GB, Apache 2.0. Cabe en los 8 GB de la RTX 5060 con margen para el escritorio.
+modelo: qwen3.5:4b-q4_K_M
+resumen_modelo: d8b0f5e9760c   # Resumen publicado en ollama.com ese dia; llm.json anota el real.
+
+# Si el modelo no responde en este tiempo, se usa la plantilla. El nodo «Redactar
+# explicacion» de n8n espera algo mas (una prueba lo compara).
+tiempo_limite_s: 20
+
+generacion:
+  temperatura: 0.2
+  semilla: 0
+  max_tokens: 220
+  razonamiento: none          # `reasoning_effort` de la API compatible: sin pensamiento visible.
+
+# Solo las alertas llevan redaccion. Los demas niveles se quedan con la plantilla.
+redactar_niveles: [alerta_prioritaria, revision_recomendada]
+
+# Comprobacion automatica de cada texto (docs/spec.md, seccion 15). Si falla, plantilla.
+# Las comparaciones se hacen sin tildes y en minusculas.
+comprobacion:
+  max_caracteres: 700
+  etiquetas_nivel:
+    alerta_prioritaria: alerta prioritaria
+    revision_recomendada: revisión recomendada
+    sin_alerta: sin alerta
+    error_evaluacion: error de evaluación
+  # Palabras que delatan una regla aunque no se cite su identificador.
+  palabras_de_regla:
+    MONTO_ALTO_UBICACION_INUSUAL: [ubicación, ubicaciones, país, países, extranjero]
+  # Expresiones regulares: el sistema senala para revision, nunca confirma fraude.
+  afirmaciones_prohibidas:
+    - fraude confirmado
+    - \bconfirm\w* (el |un |que (hay|es) )?fraude
+    - \bes (un )?fraude\b
+    - \bes fraudulent[ao]\b
+
+# Descarga del modelo (`tareas llm`). La primera vez son unos 3,3 GB.
+descarga:
+  tiempo_limite_s: 3600

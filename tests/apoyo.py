@@ -5,6 +5,10 @@ un Isolation Forest pequeno, entrenado con datos inventados, donde lo deja el pa
 No representa el fraude real: solo sirve para probar la carga y la forma de las respuestas.
 """
 
+import json
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import numpy as np
@@ -52,3 +56,55 @@ def entrenar(
         **cambios,
     }
     return modelo.guardar_artefacto(carpeta_modelo(raiz, muestra), bosque, meta)
+
+
+# --- LLM local de pruebas (fase 7) ----------------------------------------------------------
+
+TEXTO_LLM = (
+    "El sistema señala esta transacción como alerta prioritaria: se activó MONTO_ALTO porque "
+    "el monto supera el umbral. Una persona debe revisarla."
+)
+
+
+class ServidorLlm:
+    """Servidor de pruebas: responde lo que diga `self.texto`, o tarda `self.espera_s`."""
+
+    def __init__(self):
+        self.texto = TEXTO_LLM
+        self.espera_s = 0.0
+        self.codigo = 200
+        self.recibidos: list[dict] = []
+        servidor = self
+
+        class Manejador(BaseHTTPRequestHandler):
+            def log_message(self, *args):  # silencio en las pruebas
+                pass
+
+            def do_POST(self):
+                largo = int(self.headers.get("Content-Length", 0))
+                servidor.recibidos.append(
+                    {"ruta": self.path, "cuerpo": json.loads(self.rfile.read(largo))}
+                )
+                time.sleep(servidor.espera_s)
+                cuerpo = json.dumps(
+                    {
+                        "model": "modelo-de-prueba",
+                        "choices": [{"message": {"role": "assistant", "content": servidor.texto}}],
+                    }
+                ).encode()
+                try:
+                    self.send_response(servidor.codigo)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(cuerpo)))
+                    self.end_headers()
+                    self.wfile.write(cuerpo)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+        self.http = ThreadingHTTPServer(("127.0.0.1", 0), Manejador)
+        self.url = f"http://127.0.0.1:{self.http.server_address[1]}"
+        threading.Thread(target=self.http.serve_forever, daemon=True).start()
+
+    def cerrar(self):
+        self.http.shutdown()
+        self.http.server_close()

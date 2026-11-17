@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:redaccion_pedida",
+  "title": "Cuerpo de POST /explicacion",
+  "description": "Lo que envía el nodo «Redactar explicación» de n8n: el nivel ya decidido y las señales tal como las devolvió /evaluar (ADR 0016). Las alertas exigen señales.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "nivel",
+    "senales"
+  ],
+  "properties": {
+    "id_transaccion": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 100
+    },
+    "nivel": {
+      "enum": [
+        "error_evaluacion",
+        "alerta_prioritaria",
+        "revision_recomendada",
+        "sin_alerta"
+      ]
+    },
+    "senales": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "urn:fraude:contratos:evaluacion"
+        }
+      ]
+    }
+  },
+  "if": {
+    "properties": {
+      "nivel": {
+        "enum": [
+          "alerta_prioritaria",
+          "revision_recomendada"
+        ]
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "senales": {
+        "$ref": "urn:fraude:contratos:evaluacion"
+      }
+    }
+  }
+}
