@@ -33,6 +33,7 @@ ARCHIVOS = (
     "analisis_errores/falsas_alarmas.csv",
     "casos.csv",
     "revisiones.csv",
+    "flujo.json",
 )
 FIGURAS = {
     "comparativa_prueba.png",
@@ -97,6 +98,25 @@ def main() -> int:
         figuras = {p.name for p in (carpeta / "figuras").glob("*.png")}
         if figuras != FIGURAS:
             fallos.append(f"figuras/ trae {sorted(figuras)}")
+        # Fase 5: demostrar envio el lote por n8n y por Python con paridad total.
+        flujo = json.loads((carpeta / "flujo.json").read_text())
+        if flujo.get("estado") != "ok":
+            fallos.append(f"demostrar no termino bien: {flujo.get('error')}")
+        else:
+            paridad, lote = flujo["paridad"], flujo["lote"]
+            if not (paridad["completa"] and paridad["coinciden"] == paridad["total"] > 0):
+                fallos.append(f"paridad incompleta: {paridad}")
+            if paridad["total"] != lote["total"] or flujo["latencia_ms"]["n"] != lote["total"]:
+                fallos.append("flujo.json no cubre todo el lote")
+            invalidas = lote["por_tipo"]["invalida"]
+            if invalidas == 0 or flujo["niveles_n8n"].get("error_evaluacion", 0) < invalidas:
+                fallos.append("las entradas invalidas del lote no terminaron en error_evaluacion")
+            if flujo.get("reportable") is not False:
+                fallos.append("en la CI flujo.json debe venir de la muestra, marcada no reportable")
+            print(
+                f"Paridad {paridad['coinciden']}/{paridad['total']}; niveles "
+                f"{flujo['niveles_n8n']}; latencia {flujo['latencia_ms']}"
+            )
         sinteticos = DATOS / "sinteticos" / "ubicacion.json"
         if not sinteticos.is_file():
             fallos.append("falta datos/sinteticos/ubicacion.json")

@@ -29,8 +29,12 @@ jobs:
           uv run ruff format --check .
       - name: Guiones de shell (shellcheck)
         run: shellcheck fraude n8n/arranque.sh
-      - name: Pruebas unitarias
-        run: uv run pytest -v
+      - name: Pruebas unitarias, de contrato y de flujos (simulador con Node.js)
+        env:
+          FRAUDE_EXIGIR_NODE: "1"
+        run: |
+          node --version
+          uv run pytest -v
 
   punta-a-punta:
     name: Compose, n8n y flujo ping
@@ -72,7 +76,14 @@ jobs:
             echo "Hay puertos publicados fuera de 127.0.0.1"; exit 1
           fi
 
+      # Fase 5: flujos de n8n reales antes de entrenar. Sin modelo, una transaccion con
+      # variables es una evaluacion fallida (503) y queda en error_evaluacion; tambien la
+      # entrada invalida y la revision humana (200, 409, 404 y 422).
+      - name: Flujos de n8n sin modelo (rama de error y revision)
+        run: python3 tests/punta_a_punta/comprobar_flujos.py --sin-modelo
+
       # En la CI se usa la muestra para pruebas: la descarga del conjunto real es N3.
+      # `todo` incluye `demostrar`: lote por n8n y por Python, con paridad total exigida.
       - name: tareas todo --muestra (Compose directo)
         run: docker compose run --rm -T tareas todo --muestra
 
@@ -88,6 +99,11 @@ jobs:
         run: |
           docker compose run --rm -T tareas evidencia
           python3 tests/punta_a_punta/comprobar_evidencia.py --con-casos
+
+      - name: Con la API detenida, n8n responde 502 con el caso en error_evaluacion
+        run: |
+          docker compose stop api
+          python3 tests/punta_a_punta/comprobar_flujos.py --api-detenida
 
       - name: Apagar
         run: docker compose down
