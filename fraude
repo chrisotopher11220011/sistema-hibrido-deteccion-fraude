@@ -200,7 +200,7 @@ recoger_anfitrion() {
     local omarchy="" origen_omarchy="no detectado" sistema="" nucleo docker_motor compose_version
     local grafica="" origen_grafica="no detectada" nvidia_en_docker="false" cortafuegos memoria_mb=""
     local procesador="" nucleos="" disco_libre_gb="" uso_sudo="false" puertos="" puertos_antes=""
-    local llm_solicitado="false" llm_ejecucion_json="null" nvidia_smi="false"
+    local llm_solicitado="false" llm_ejecucion_json="null" nvidia_smi="false" memoria_grafica="null"
 
     if command -v omarchy-version >/dev/null 2>&1; then
         omarchy="$(primera_linea omarchy-version)"; origen_omarchy="omarchy-version"
@@ -251,6 +251,12 @@ recoger_anfitrion() {
     if [ -n "$(llm_ejecucion)" ]; then
         llm_solicitado="true"
         llm_ejecucion_json="$(json_cadena "$(llm_ejecucion)")"
+        # Memoria ocupada en la grafica vista desde el anfitrion, independiente de lo que
+        # informe Ollama: con el modelo cargado, unos 3 GB mas que sin el.
+        if [ "$nvidia_smi" = "true" ]; then
+            memoria_grafica="$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | head -n 1 | tr -dc '0-9')"
+            [ -n "$memoria_grafica" ] || memoria_grafica="null"
+        fi
     fi
 
     cat > "$EN_CURSO/anfitrion.json" <<FIN
@@ -269,7 +275,7 @@ recoger_anfitrion() {
   "nucleos": ${nucleos:-null},
   "memoria_mb": ${memoria_mb:-null},
   "disco_libre_gb": ${disco_libre_gb:-null},
-  "llm": {"solicitado": $llm_solicitado, "ejecucion": $llm_ejecucion_json, "nvidia_smi": $nvidia_smi, "runtime_nvidia": $nvidia_en_docker},
+  "llm": {"solicitado": $llm_solicitado, "ejecucion": $llm_ejecucion_json, "nvidia_smi": $nvidia_smi, "runtime_nvidia": $nvidia_en_docker, "grafica_memoria_usada_mib": $memoria_grafica},
   "puertos": {"api": $PUERTO_API, "n8n": $PUERTO_N8N, "en_escucha_antes_de_arrancar": $(json_cadena "$puertos_antes"), "en_escucha_ahora": $(json_cadena "$puertos")}
 }
 FIN
@@ -358,12 +364,22 @@ activar_llm() {
     decir "La primera vez descarga el servidor de modelos (unos 3,4 GB) y el modelo (unos 3,3 GB)."
 }
 
+# Con --llm, si el arranque falla se reintenta en el procesador y, si tampoco, sin LLM: el
+# sistema funciona igual sin el (seccion 14); las explicaciones usan la plantilla.
 arrancar_servicios() {
     compose up -d --build --wait --wait-timeout 420 && return 0
     if [ "$(llm_ejecucion)" = "grafica" ]; then
-        avisar "La grafica no arranco dentro de Docker; reintento con el LLM en el procesador."
-        avisar "Revisa la preparacion de la grafica en EJECUTAR.md (seccion «LLM local»)."
+        avisar "No arrancaron todos los servicios con la grafica; reintento con el LLM en el procesador."
+        avisar "Si es la grafica, revisa su preparacion en EJECUTAR.md (seccion «LLM local»)."
         printf 'procesador\n' > "$ESTADO_LLM"
+        compose up -d --build --wait --wait-timeout 420 && return 0
+    fi
+    if [ -n "$(llm_ejecucion)" ]; then
+        avisar "No arrancaron todos los servicios con el LLM; sigo sin el: las explicaciones usaran la plantilla."
+        compose rm -s -f llm >/dev/null 2>&1 || true
+        rm -f "$ESTADO_LLM"
+        printf '{"estado": "fallo", "error": "%s"}\n' \
+            "El servicio llm no arranco con ./fraude todo --llm; se siguio sin LLM" > "$EN_CURSO/llm.json"
         compose up -d --build --wait --wait-timeout 420 && return 0
     fi
     return 1
@@ -387,8 +403,9 @@ cmd_todo() {
     nueva_sesion
     if [ "$con_llm" -eq 1 ]; then
         activar_llm
-        opciones_tareas+=(--llm)
-    else
+    elif [ -f "$ESTADO_LLM" ]; then
+        # Venia de un `todo --llm`: se detiene `llm` para liberar la grafica y la memoria.
+        compose rm -s -f llm >/dev/null 2>&1 || true
         rm -f "$ESTADO_LLM"
     fi
     if compose ps -q 2>/dev/null | grep -q .; then
@@ -405,6 +422,7 @@ cmd_todo() {
     fi
     decir "La primera vez descarga imagenes y puede tardar varios minutos."
     if arrancar_servicios; then
+        [ -n "$(llm_ejecucion)" ] && opciones_tareas+=(--llm)
         decir "Servicios en marcha: la API y n8n responden."
         decir "Paso 2 de 3: ejecutar los pasos del proyecto."
         tareas tareas todo --sin-evidencia "${opciones_tareas[@]}" || codigo=$?

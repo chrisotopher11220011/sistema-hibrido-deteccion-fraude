@@ -194,6 +194,14 @@ def test_la_comprobacion_no_depende_de_tildes_ni_mayusculas():
         (BUENO + " Fraude confirmado.", "afirmacion_prohibida"),
         (BUENO + " Se confirma el fraude.", "afirmacion_prohibida"),
         (BUENO + " Es fraudulenta.", "afirmacion_prohibida"),
+        (BUENO + " Se trata de una transacción fraudulenta.", "afirmacion_prohibida"),
+        (BUENO + " Hay fraude en esta operación.", "afirmacion_prohibida"),
+        (BUENO + " Esto es claramente un fraude.", "afirmacion_prohibida"),
+        (BUENO + " Fraude detectado por el modelo.", "afirmacion_prohibida"),
+        (BUENO + " El modelo detectó un fraude.", "afirmacion_prohibida"),
+        (BUENO + " La transacción fue bloqueada.", "afirmacion_prohibida"),
+        (BUENO + " La tarjeta fue cancelada.", "afirmacion_prohibida"),
+        (BUENO + " Pesó 1250USD.".replace("1250", "1999"), "cifra_no_calculada:1999"),
         (BUENO + " x" * 400, "demasiado_largo"),
         (BUENO + " Superó el umbral por 0.072 puntos.", "cifra_no_calculada:0.072"),
         (BUENO.replace("1250.00", "1350.00"), "cifra_no_calculada:1350.00"),
@@ -354,3 +362,55 @@ def test_las_cifras_del_mensaje_pueden_citarse_con_otro_formato():
         "supera el umbral prioritario 0.74. Pesaron V14 (0.21) y V4. Una persona debe revisarla."
     )
     assert explicacion.comprobar(texto, "alerta_prioritaria", _senales(), CONFIG)["valida"]
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "Alerta prioritaria: se activó la regla Monto Alto. Debe revisarse.",
+        "Alerta prioritaria: la regla MONTO ALTO se activó. Debe revisarse.",
+        "Alerta prioritaria por el monto alto. Debe revisarse.",
+    ],
+)
+def test_regla_no_activada_nombrada_con_palabras(texto):
+    senales = _senales(monto=False, anomalia=True)
+    senales["reglas"][0]["evaluable"] = True
+    resultado = explicacion.comprobar(texto, "alerta_prioritaria", senales, CONFIG)
+    assert "regla_no_activada:MONTO_ALTO" in resultado["fallos"]
+
+
+def test_el_signo_de_una_cifra_cuenta():
+    senales = _senales()
+    senales["modelo"]["contribuciones"][0]["peso"] = -0.25
+    texto = "Alerta prioritaria: se activó MONTO_ALTO; V14 pesa +0.250. Debe revisarse."
+    resultado = explicacion.comprobar(texto, "alerta_prioritaria", senales, CONFIG)
+    assert "cifra_no_calculada:+0.250" in resultado["fallos"]
+    texto = "Alerta prioritaria: se activó MONTO_ALTO; V14 pesa -0.250. Debe revisarse."
+    assert explicacion.comprobar(texto, "alerta_prioritaria", senales, CONFIG)["valida"]
+
+
+def test_la_peticion_tiene_un_tiempo_total():
+    import threading
+
+    soltar = threading.Event()
+
+    def colgada(url, cuerpo, tiempo_limite):
+        soltar.wait(5)
+        return _respuesta(BUENO)
+
+    config = {**CONFIG, "tiempo_limite_s": 0.2}
+    try:
+        redaccion = _redactar(colgada, config=config)
+    finally:
+        soltar.set()
+    assert redaccion["respaldo"]["motivo"] == "tiempo_agotado"
+
+
+@pytest.mark.parametrize("excepcion", ["IncompleteRead", "BadStatusLine", "LineTooLong"])
+def test_errores_del_protocolo_http_son_error_del_llm(excepcion):
+    import http.client
+
+    clase = getattr(http.client, excepcion)
+    fallo = clase(b"x") if excepcion == "IncompleteRead" else clase("x")
+    redaccion = _redactar(Pedidos(fallo))
+    assert redaccion["respaldo"]["motivo"] == "error_llm"

@@ -31,6 +31,7 @@ if [ "$1" = "compose" ]; then
         *" up "*)
             [ -n "${FALSO_UP_FALLA:-}" ] && exit 1
             [ -n "${FALSO_UP_FALLA_CON_GRAFICA:-}" ] && [ -n "${COMPOSE_FILE:-}" ] && exit 1
+            [ -n "${FALSO_UP_FALLA_CON_LLM:-}" ] && [ -n "${COMPOSE_PROFILES:-}" ] && exit 1
             exit 0 ;;
         *" logs "*) echo "registro de ${!#} TELEGRAM_TOKEN=abc"; exit 0 ;;
         *" tareas todo"*)
@@ -67,6 +68,7 @@ FALSO_ES_SUDO=1 exec "$@"
 NVIDIA_SMI_FALSO = r"""#!/bin/bash
 [ -z "${FALSO_NVIDIA:-}" ] && exit 9
 if [ "$1" = "-L" ]; then echo "GPU 0: NVIDIA GeForce RTX 5060 Laptop GPU"; exit 0; fi
+if [ "$1" = "--query-gpu=memory.used" ]; then echo "3312"; exit 0; fi
 echo "NVIDIA GeForce RTX 5060 Laptop GPU, 8151 MiB, 580.95"
 """
 
@@ -424,6 +426,7 @@ def test_todo_con_llm_y_grafica_preparada_usa_la_grafica(guion):
         "ejecucion": "grafica",
         "nvidia_smi": True,
         "runtime_nvidia": True,
+        "grafica_memoria_usada_mib": 3312,
     }
 
 
@@ -497,3 +500,27 @@ def test_opcion_desconocida_sigue_fallando(guion):
 
     assert resultado.returncode == 2
     assert "No conozco la opcion" in resultado.stderr
+
+
+def test_si_el_llm_no_arranca_sigue_sin_el(guion):
+    resultado = guion.ejecutar("todo", "--llm", FALSO_UP_FALLA_CON_LLM="1")
+
+    assert resultado.returncode == 0, resultado.stderr
+    arranques = [linea for linea in guion.entorno_compose() if " up " in linea]
+    assert "perfiles=llm" in arranques[0]
+    assert "perfiles= " in arranques[-1] and "llm=desactivado" in arranques[-1]
+    assert "plantilla" in resultado.stderr + resultado.stdout
+    tareas = _linea(guion.llamadas(), "tareas todo")
+    assert "--llm" not in tareas
+    anfitrion = json.loads((guion.en_curso() / "anfitrion.json").read_text())
+    assert anfitrion["llm"]["solicitado"] is False
+    llm = json.loads((guion.en_curso() / "llm.json").read_text())
+    assert llm["estado"] == "fallo" and "sin LLM" in llm["error"]
+
+
+def test_todo_sin_llm_detiene_el_llm_de_antes(guion):
+    guion.ejecutar("todo", "--llm")
+    guion.ejecutar("todo")
+
+    retirada = _linea(guion.entorno_compose(), "rm -s -f llm")
+    assert "perfiles=llm" in retirada

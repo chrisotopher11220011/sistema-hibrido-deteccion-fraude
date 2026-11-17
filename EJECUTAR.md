@@ -130,10 +130,10 @@ debe mostrar la misma tabla que `nvidia-smi`. Esto **no** usa los modelos locale
 
 1. `LLM local activado: usara la grafica NVIDIA.` Si la gráfica no está preparada, en cambio, `LLM local activado en el procesador (mas lento)…` con las órdenes del paso 6.1. Las dos sirven; anota cuál apareció.
 2. `Paso 1 de 3: construir y arrancar los servicios (api, n8n y llm).` La primera vez descarga la imagen de Ollama (unos 3,4 GB): puede tardar bastante según tu conexión.
-3. `[llm] Servidor Ollama 0.40.16 …` y el progreso de la descarga del modelo: `[llm] Descargando qwen3.5:4b-q4_K_M: 10 % …` hasta `100 %` (unos 3,3 GB, solo la primera vez). Luego `[llm] Listo. Modelo qwen3.5:4b-q4_K_M listo en Ollama 0.40.16, en la grafica (grafica; llm.json).` Si dice *el procesador*, la gráfica no se usó.
+3. `[llm] Servidor Ollama 0.40.16 …` y el progreso de la descarga del modelo: `[llm] Descargando qwen3.5:4b-q4_K_M: 10 % …` hasta `100 %` (unos 3,3 GB, solo la primera vez). Luego `[llm] Listo. Modelo qwen3.5:4b-q4_K_M listo en Ollama 0.40.16; segun Ollama, 100% de su memoria en la grafica (grafica; llm.json).` Si dice 0 %, la gráfica no se usó. Para confirmarlo, en otra terminal: `nvidia-smi` debe mostrar unos 3 GB más de memoria usada mientras el sistema está en marcha (la evidencia lo anota sola).
 4. El resto como siempre. `demostrar` tarda algo más: cada alerta espera su explicación.
 
-Si `[llm]` marca `ERROR`, **no pasa nada**: las explicaciones usarán la plantilla y la evidencia dice por qué.
+Si `[llm]` marca `ERROR`, o aparece `sigo sin el: las explicaciones usaran la plantilla`, **no pasa nada**: el resto funciona igual y la evidencia dice por qué.
 
 ### 6.3 Mirar las explicaciones en la página
 

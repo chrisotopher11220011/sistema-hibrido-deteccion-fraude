@@ -559,7 +559,8 @@ def _registrar_explicaciones(raiz):
          "comprobacion": {"valida": False, "fallos": ["afirmacion_prohibida:es fraude"]}},
         {"texto": plantilla, "origen": "plantilla", "modelo": None, "duracion_ms": None,
          "respaldo": {**respaldo, "motivo": "tiempo_agotado", "detalle": "20 s",
-                      "modelo": "qwen3.5:4b-q4_K_M", "duracion_ms": 20000.0},
+                      "modelo": "qwen3.5:4b-q4_K_M", "duracion_ms": 20000.0,
+                      "texto_descartado": "Llego tarde, sin comprobar."},
          "comprobacion": None},
         {"texto": plantilla, "origen": "plantilla", "modelo": None, "duracion_ms": None,
          "respaldo": {**respaldo, "motivo": "error_api", "detalle": "ECONNREFUSED"},
@@ -645,7 +646,7 @@ def test_copia_llm_json_y_lo_resume(tmp_path):
     assert json.loads((carpeta / "llm.json").read_text()) == llm
     assert json.loads((carpeta / "explicaciones.json").read_text())["servidor"] == llm
     resumen = (carpeta / "RESUMEN.md").read_text()
-    assert "LLM local: qwen3.5:4b-q4_K_M en Ollama 0.40.16, en la grafica" in resumen
+    assert "LLM local: qwen3.5:4b-q4_K_M en Ollama 0.40.16, segun Ollama, 100% de su" in resumen
 
 
 def test_sin_llm_lo_anota(tmp_path):

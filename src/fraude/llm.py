@@ -119,6 +119,11 @@ def preparar_llm(raiz: Path, muestra: bool = False) -> dict:
         "carga_s": None,
         "memoria": None,
         "ejecucion": None,
+        "fuente_ejecucion": (
+            "GET /api/ps (size_vram) de Ollama. Indicio, no prueba: en un ejecutor sin "
+            "grafica llego a informar memoria en ella. La prueba es anfitrion.json "
+            "(llm.grafica_memoria_usada_mib, de nvidia-smi)."
+        ),
         "error": None,
     }
     try:

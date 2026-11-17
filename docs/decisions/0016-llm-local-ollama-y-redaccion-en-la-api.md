@@ -23,7 +23,7 @@ Todo lo que depende de versiones se comprobó el 2026-11-17 (detalle y fuentes e
 
 **Qué ve el LLM.** Solo el nivel, las reglas activadas con su razón (y si son de alto riesgo), la puntuación y los umbrales del modelo y las contribuciones. Nunca las `variables`, el identificador de la transacción ni la etiqueta.
 
-**Comprobación automática** (`explicacion.comprobar`, sin tildes y sin distinguir mayúsculas). Se rechaza el texto vacío, con razonamiento visible (`<think>`), de más de 700 caracteres, que no menciona la etiqueta de su nivel o menciona la de otro, que nombra una regla no activada (por su identificador o por palabras como «país» para la de ubicación), que inventa una regla con forma de identificador, que cita una variable que no está en las contribuciones o que afirma fraude («es fraude», «fraude confirmado», «se confirma el fraude»…). Etiquetas, palabras y expresiones están en `config/llm.yaml`.
+**Comprobación automática** (`explicacion.comprobar`, sin tildes y sin distinguir mayúsculas). Se rechaza el texto vacío, con razonamiento visible (`<think>`), de más de 700 caracteres, que no menciona la etiqueta de su nivel o menciona la de otro, que nombra una regla no activada (por su identificador, por el identificador como frase, «monto alto», o por palabras como «país» para la de ubicación), que inventa una regla con forma de identificador, que cita una variable que no está en las contribuciones, que trae una cifra que no es, ni redondea, una del mensaje al LLM (con su signo; los enteros del 0 al 10 sin signo quedan libres), o que afirma fraude o una acción que el sistema no hace («es fraude», «hay fraude», «fraudulenta», «fraude detectado», «bloqueada», «cancelada»…). Etiquetas, palabras y expresiones están en `config/llm.yaml`. Es una comprobación de forma, no de sentido: no detecta, por ejemplo, un texto que use cifras del mensaje para decir lo contrario de lo que dicen («la puntuación no supera el umbral»). Por eso la página muestra siempre al lado las señales y el revisor decide.
 
 **Respaldo, en dos capas.**
 
@@ -31,8 +31,8 @@ Todo lo que depende de versiones se comprobó el 2026-11-17 (detalle y fuentes e
 |---|---|---|
 | API | `./fraude todo` sin `--llm` (`FRAUDE_LLM=desactivado`) | `llm_desactivado` |
 | API | Nivel `sin_alerta` o `error_evaluacion` | `nivel_sin_redaccion` (n8n ni siquiera lo pide) |
-| API | El LLM no responde en `tiempo_limite_s` (20 s) | `tiempo_agotado` |
-| API | Error de red, HTTP o respuesta sin texto | `error_llm` |
+| API | El LLM no responde en `tiempo_limite_s` (20 s, tiempo total impuesto con un hilo: el de urllib es por operación) | `tiempo_agotado` |
+| API | Error de red, HTTP (también los del protocolo, como `IncompleteRead`) o respuesta sin texto | `error_llm` |
 | API | El texto no pasa la comprobación | `comprobacion_fallida`, con el texto descartado |
 | n8n | `/explicacion` no responde en 30 s, responde otro código o algo que no es una redacción | `error_api` |
 
@@ -40,11 +40,11 @@ En todos, el caso guarda el texto de la plantilla de n8n con `origen: plantilla`
 
 **Contrato.** Ampliaciones sin cambiar nada de lo existente: ruta `POST /explicacion` (8.6), esquemas `redaccion_pedida` y `redaccion`, y campos opcionales `respaldo` y `comprobacion` en `explicacion` del caso (8.5). Comando `tareas llm` y opción `todo --llm` (8.8).
 
-**Gráfica.** `compose.gpu.yaml` reserva la gráfica para `llm`. `./fraude todo --llm` lo añade solo si `nvidia-smi` responde y Docker tiene el entorno `nvidia`; si no, avisa y sigue en el procesador. Si el arranque con gráfica falla, reintenta en el procesador. El estado (`grafica` o `procesador`) se guarda en `resultados/en_curso/.llm` para que los pasos sueltos usen el mismo Compose y no recreen la API sin LLM; `./fraude apagar` lo borra y detiene también `llm`.
+**Gráfica.** `compose.gpu.yaml` reserva la gráfica para `llm`. `./fraude todo --llm` lo añade solo si `nvidia-smi` responde y Docker tiene el entorno `nvidia`; si no, avisa y sigue en el procesador. Si el arranque con gráfica falla, reintenta en el procesador; si tampoco arranca, sigue **sin LLM** y lo anota en `llm.json`. Un `./fraude todo` sin `--llm` después de uno con él detiene `llm`. El estado (`grafica` o `procesador`) se guarda en `resultados/en_curso/.llm` para que los pasos sueltos usen el mismo Compose y no recreen la API sin LLM; `./fraude apagar` lo borra y detiene también `llm`.
 
 **Preparación única en Omarchy 4**, con permisos de administrador: `sudo pacman -S nvidia-container-toolkit` (o `omarchy pkg add nvidia-container-toolkit`; paquete 1.20.1 de *extra*), `sudo nvidia-ctk runtime configure --runtime=docker` y `sudo systemctl restart docker`. Está en `EJECUTAR.md`.
 
-**Trazabilidad.** Cada explicación guarda origen, modelo, tiempo, respaldo y comprobación. `tareas llm` deja `llm.json` (servidor, modelo, resumen, tiempos de descarga y carga, memoria de la gráfica usada y si corre en la gráfica, en el procesador o mixto). `tareas evidencia` deja `explicaciones.json` con origen, motivos, tiempos (mediana, p95 y máximo), tasa de fallos de la comprobación por tipo, la comprobación repetida sobre lo guardado y una muestra de textos sin secretos.
+**Trazabilidad.** Cada explicación guarda origen, modelo, tiempo, respaldo y comprobación. `tareas llm` deja `llm.json` (servidor, modelo, resumen, tiempos de descarga y carga, y la memoria que Ollama dice tener en la gráfica, `size_vram`). Ese dato es un indicio, no una prueba: en un ejecutor de la CI sin gráfica Ollama llegó a informar el 38 % «en la gráfica». La prueba es `anfitrion.json`: cómo lo arrancó `./fraude` y la memoria usada según `nvidia-smi` del anfitrión. `tareas evidencia` deja `explicaciones.json` con origen, motivos, tiempos (mediana, p95 y máximo), tasa de fallos de la comprobación por tipo, la comprobación repetida sobre lo guardado y una muestra de textos sin secretos.
 
 **N2.** Un trabajo de la CI ejecuta `./fraude todo --muestra --llm` con Ollama real en el procesador y `qwen3.5:0.8b`, de la misma familia: comprueba el camino entero, no la calidad del texto del modelo fijado.
 

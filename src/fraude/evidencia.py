@@ -394,11 +394,17 @@ def _exportar_explicaciones(raiz: Path, en_curso: Path, carpeta: Path) -> list[s
     if servidor is not None:
         shutil.copyfile(en_curso / "llm.json", carpeta / "llm.json")
         if servidor.get("estado") == "ok":
-            lugar = {
-                "grafica": "en la grafica",
-                "procesador": "en el procesador",
-                "mixta": "entre grafica y procesador",
-            }.get(servidor.get("ejecucion"), "sin dato de la grafica")
+            fraccion = (servidor.get("memoria") or {}).get("fraccion_en_grafica")
+            lugar = (
+                "sin dato de la grafica"
+                if fraccion is None
+                else (f"segun Ollama, {fraccion:.0%} de su memoria en la grafica")
+            )
+            anfitrion = (_leer(en_curso / "anfitrion.json") or {}).get("llm") or {}
+            if anfitrion.get("ejecucion"):
+                lugar += f"; ./fraude lo arranco con {anfitrion['ejecucion']}"
+            if anfitrion.get("grafica_memoria_usada_mib") is not None:
+                lugar += f" y nvidia-smi marca {anfitrion['grafica_memoria_usada_mib']} MiB usados"
             coincide = (servidor.get("modelo") or {}).get("coincide_con_el_fijado")
             aviso = "" if coincide is not False else " AVISO: el resumen no es el fijado."
             notas.append(

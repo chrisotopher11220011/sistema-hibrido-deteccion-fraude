@@ -5,7 +5,7 @@ Uso: python tests/punta_a_punta/comprobar_llm.py
 Se ejecuta tras `./fraude todo --muestra --llm` con Ollama real en el procesador y un modelo
 diminuto (no el fijado: en la CI no hay grafica ni tiempo para el de 4B). Exige:
 
-- `llm.json`: servidor y modelo listos; en la CI, en el procesador.
+- `llm.json`: servidor y modelo listos. `anfitrion.json`: arrancado en el procesador.
 - `flujo.json`: paridad total con el LLM activo. El nivel de cada transaccion del lote sale
   igual por n8n (que pidio la redaccion) que por la tabla en Python: el LLM no lo cambio.
 - `explicaciones.json`: todas las alertas llegaron al LLM (ningun respaldo por LLM
@@ -40,7 +40,9 @@ def main() -> int:
     llm = json.loads((carpeta / "llm.json").read_text(encoding="utf-8"))
     print("llm.json:", json.dumps(llm, ensure_ascii=False))
     exigir(llm["estado"] == "ok", f"el LLM no quedo listo: {llm.get('error')}")
-    exigir(llm.get("ejecucion") == "procesador", f"ejecucion inesperada: {llm.get('ejecucion')}")
+    # `ejecucion` de llm.json es lo que informa Ollama (size_vram): en un ejecutor sin grafica
+    # llego a decir «mixta». Lo que manda es como lo arranco ./fraude (anfitrion.json).
+    print(f"Segun Ollama: {llm.get('ejecucion')} ({llm.get('memoria')})")
 
     anfitrion = json.loads((carpeta / "anfitrion.json").read_text(encoding="utf-8"))
     exigir(anfitrion["llm"]["solicitado"] is True, "anfitrion.json no anota el LLM")

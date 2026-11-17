@@ -13,6 +13,8 @@ nivel: cuando n8n pide la redaccion, el nivel ya salio del nodo «Clasificar niv
 Parametros en `config/llm.yaml`. La llamada usa la API compatible con OpenAI de Ollama.
 """
 
+import concurrent.futures
+import http.client
 import json
 import os
 import re
@@ -25,13 +27,14 @@ import urllib.request
 _FORMA_DE_REGLA = re.compile(r"(?<![A-Za-z0-9_])[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?![A-Za-z0-9_])")
 _VARIABLE = re.compile(r"(?<![A-Za-z0-9_])V([1-9]|1[0-9]|2[0-8])(?![A-Za-z0-9_])")
 # Cifras sueltas: no las que forman parte de un identificador (V14) ni de una palabra.
-_CIFRA = re.compile(r"(?<![\w.,])\d+(?:[.,]\d+)*(?![\w])")
+_CIFRA = re.compile(r"(?<![\w.,])[-+−]?\d+(?:[.,]\d+)*(?![\d])")
 # Enteros pequenos («las 3 variables») se admiten aunque no esten en el mensaje.
 _ENTERO_LIBRE = 10
 
 
 def _leer_cifra(texto: str) -> tuple[float, int] | None:
-    """Valor y decimales de una cifra escrita con punto o coma decimal."""
+    """Valor y decimales de una cifra escrita con punto o coma decimal (con su signo)."""
+    texto = texto.replace("−", "-").lstrip("+")
     if "." in texto and "," in texto:
         texto = texto.replace(".", "").replace(",", ".")
     else:
@@ -55,7 +58,7 @@ def _cifras_inventadas(texto: str, mensaje: str) -> list[str]:
             inventadas.append(crudo)
             continue
         valor, decimales = leida
-        if decimales == 0 and valor <= _ENTERO_LIBRE:
+        if decimales == 0 and 0 <= valor <= _ENTERO_LIBRE and not crudo.startswith(("+", "-")):
             continue
         margen = 0.5 * 10**-decimales + 1e-9
         if not any(abs(valor - p) <= margen for p in permitidas):
@@ -174,7 +177,8 @@ def comprobar(texto: str, nivel: str, senales: dict, config: dict) -> dict:
     conocidas = {r["id"] for r in reglas}
     citadas = {m.group(0).upper() for m in _FORMA_DE_REGLA.finditer(texto.upper())}
     for id_regla in sorted(conocidas - activadas):
-        palabras = reglas_config.get("palabras_de_regla", {}).get(id_regla, [])
+        palabras = [id_regla.replace("_", " ").lower()]
+        palabras += reglas_config.get("palabras_de_regla", {}).get(id_regla, [])
         if id_regla in citadas or any(_contiene_palabra(normal, p) for p in palabras):
             fallos.append(f"regla_no_activada:{id_regla}")
     for id_citado in sorted(citadas - conocidas):
@@ -214,7 +218,14 @@ def pedir_http(url: str, cuerpo: dict, tiempo_limite: float) -> dict:
         if isinstance(error.reason, TimeoutError):
             raise TimeoutError(str(error.reason)) from error
         raise OSError(str(error.reason)) from error
+    except http.client.HTTPException as error:
+        raise OSError(f"{type(error).__name__}: {error}") from error
     return json.loads(contenido)
+
+
+# Hilos para imponer un tiempo total a la llamada: el `timeout` de urllib es por operacion
+# del socket. Una llamada que se pasa sigue en su hilo hasta que el socket la corta.
+_HILOS = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="llm")
 
 
 def _respaldo(motivo: str, detalle: str, modelo=None, duracion_ms=None, descartado=None) -> dict:
@@ -283,13 +294,13 @@ def redactar(
     url = config["servidor"]["url"].rstrip("/") + "/v1/chat/completions"
     inicio = reloj()
     try:
-        respuesta = pedir(url, cuerpo, limite)
+        respuesta = _HILOS.submit(pedir, url, cuerpo, limite).result(timeout=limite)
         texto = _texto_de(respuesta)
     except TimeoutError as error:
         duracion = round((reloj() - inicio) * 1000, 1)
         detalle = f"El LLM no respondió en {limite:g} s ({error})."
         return _plantilla(_respaldo("tiempo_agotado", detalle, modelo_config, duracion))
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, http.client.HTTPException) as error:
         duracion = round((reloj() - inicio) * 1000, 1)
         detalle = f"{type(error).__name__}: {error}"
         return _plantilla(_respaldo("error_llm", detalle, modelo_config, duracion))

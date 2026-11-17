@@ -37,14 +37,20 @@ comprobacion:
     sin_alerta: sin alerta
     error_evaluacion: error de evaluación
   # Palabras que delatan una regla aunque no se cite su identificador.
+  # Ademas del identificador, se busca el identificador como frase («monto alto»).
   palabras_de_regla:
     MONTO_ALTO_UBICACION_INUSUAL: [ubicación, ubicaciones, país, países, extranjero]
   # Expresiones regulares: el sistema senala para revision, nunca confirma fraude.
+  # Son conservadoras: tambien descartan negaciones («no es fraude»); la plantilla las cubre.
   afirmaciones_prohibidas:
     - fraude confirmado
+    - fraude detectado
     - \bconfirm\w* (el |un |que (hay|es) )?fraude
-    - \bes (un )?fraude\b
-    - \bes fraudulent[ao]\b
+    - \bdetect\w* (un |el )?fraude
+    - \b(es|son|fue|hay|existe|se trata de)\b[^.;:]{0,25}\bfraude\b
+    - \bfraudulent[ao]s?\b
+    - \bbloque(o|a|ad[ao]s?|ar|amos)\b
+    - \bcancelad[ao]s?\b
 
 # Descarga del modelo (`tareas llm`). La primera vez son unos 3,3 GB.
 descarga:

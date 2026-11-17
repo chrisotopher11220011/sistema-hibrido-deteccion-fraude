@@ -63,15 +63,12 @@ def _detalle_demostrar(informe: dict) -> str:
 
 def _detalle_llm(informe: dict) -> str:
     version = informe["servidor"]["version"]
-    lugar = {
-        "grafica": "la grafica",
-        "procesador": "el procesador",
-        "mixta": "grafica y procesador",
-    }
-    donde = lugar.get(informe.get("ejecucion"), "lugar desconocido")
+    memoria = informe.get("memoria") or {}
+    fraccion = memoria.get("fraccion_en_grafica")
+    en_grafica = "sin dato" if fraccion is None else f"{fraccion:.0%}"
     return (
-        f"Modelo {informe['modelo']['nombre']} listo en Ollama {version}, en {donde} "
-        f"({informe.get('ejecucion')}; llm.json)."
+        f"Modelo {informe['modelo']['nombre']} listo en Ollama {version}; segun Ollama, "
+        f"{en_grafica} de su memoria en la grafica ({informe.get('ejecucion')}; llm.json)."
     )
 
 

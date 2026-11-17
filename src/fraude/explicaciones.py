@@ -95,9 +95,10 @@ def resumir(casos: list[dict], config_llm: dict | None, servidor: dict | None, e
             contenido["intentos_llm"] += 1
             if isinstance(respaldo.get("duracion_ms"), int | float):
                 duraciones_intentos.append(respaldo["duracion_ms"])
-            if respaldo.get("texto_descartado") is not None:
-                comprobados += 1
+            # Solo cuenta lo que paso por la comprobacion: un texto que llego tarde se
+            # descarta sin comprobar.
             if respaldo["motivo"] == "comprobacion_fallida":
+                comprobados += 1
                 fallidos += 1
                 for fallo in (e.get("comprobacion") or {}).get("fallos", []):
                     por_fallo[_tipo(fallo)] += 1
