@@ -33,7 +33,7 @@ cd sistema-hibrido-deteccion-fraude
 1. `Docker pide permisos de administrador (es lo normal en Omarchy 4).` y después la petición de tu contraseña. Al escribirla no se ve nada en pantalla; es normal.
 2. `Paso 1 de 3: construir y arrancar los servicios (api y n8n).` Aquí se descargan las imágenes. La primera vez puede tardar varios minutos; las siguientes, menos de uno.
 3. `Servicios en marcha: la API y n8n responden.`
-4. `Paso 2 de 3: ejecutar los pasos del proyecto.` Primero `[preparar] Descargando el conjunto de OpenML (unos 150 MB)...` y, al terminar, una línea como `[preparar] Listo. Fuente openml: 284807 transacciones, 492 fraudes; particion creada.` Si la columna `Time` no llega, verás un `AVISO` sobre ella: es esperable y el paso sigue. Después `[entrenar] Listo. Modelo ...; umbrales elegidos en validacion (modelo.json).` (unos segundos) y `[evaluar] Listo. Protocolo de la seccion 15 en ... s: ...` (uno o dos minutos: repite el entrenamiento con diez semillas y hace mil remuestreos). El paso `demostrar` solo avisa de que llega en la fase 5.
+4. `Paso 2 de 3: ejecutar los pasos del proyecto.` Primero `[preparar] Descargando el conjunto de OpenML (unos 150 MB)...` y, al terminar, una línea como `[preparar] Listo. Fuente openml: 284807 transacciones, 492 fraudes; particion creada.` Si la columna `Time` no llega, verás un `AVISO` sobre ella: es esperable y el paso sigue. Después `[entrenar] Listo. Modelo ...; umbrales elegidos en validacion (modelo.json).` (unos segundos) y `[evaluar] Listo. Protocolo de la seccion 15 en ... s: ...` (uno o dos minutos: repite el entrenamiento con diez semillas y hace mil remuestreos). Por último `[demostrar] Listo. Lote de ... por n8n y por Python: paridad N/N; latencia mediana ... ms, p95 ... ms (flujo.json).` (uno o dos minutos): envía el lote de demostración por n8n y comprueba que n8n y Python clasifican igual cada transacción. Si las dos cifras de `paridad` no coinciden, el paso marca `ERROR`: no pasa nada, la evidencia lo recoge.
 5. `Paso 3 de 3: evidencia.` y una línea como `Evidencia lista: resultados/20261117T153000Z_ab12cd3/ y resultados/20261117T153000Z_ab12cd3.zip`.
 6. `Todo termino bien.`
 
@@ -86,6 +86,8 @@ Si quieres, haz una captura con `Print Screen`. Se guarda sola en `~/Pictures/Sc
 | ¿El entrenamiento termina en minutos y cabe en tu equipo? | `modelo.json`: `tiempo_entrenamiento_s`; `metricas.json`: `duracion_s` |
 | ¿Qué tal detectan las reglas, el modelo y el híbrido? | `comparativa.md`, `metricas.json` y `figuras/` (parte de prueba) |
 | ¿Qué fraudes se escapan y qué falsas alarmas hay? | `analisis_errores/` (parte de validación) |
+| ¿n8n clasifica igual que Python cada transacción del lote y cuánto tarda? | `flujo.json`: `paridad` y `latencia_ms` |
+| ¿Se registran los casos y quedan pendientes los que deben? | `casos.csv` |
 
 ## Si algo va mal
 
