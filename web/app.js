@@ -244,7 +244,7 @@ function pausar(titulo, detalle) {
   estado.corriendo = false;
   clearTimeout(estado.temporizador);
   const total = estado.lote ? estado.lote.elementos.length : 0;
-  mostrarEstado('pausa', titulo, detalle ?? `Van ${entero.format(estado.cursor)} de ${entero.format(total)}. Pulsa Continuar simulación para seguir.`);
+  mostrarEstado('pausa', titulo, detalle ?? `Van ${entero.format(estado.cursor)} de ${entero.format(total)}. Pulsa ${botonSeguir()} para seguir.`);
   actualizarMando();
 }
 
@@ -282,7 +282,7 @@ async function enviarSiguiente() {
     estado.cursor -= 1; // no se evaluó: se reintentará al continuar
     seguir = false;
     pausar('La API no responde. La simulación quedó en pausa.',
-      'Comprueba los servicios con ./fraude estado; si están detenidos, ejecuta ./fraude todo. Después pulsa Continuar simulación.');
+      `Comprueba los servicios con ./fraude estado; si están detenidos, ejecuta ./fraude todo. Después pulsa ${botonSeguir()}.`);
     mostrarEstadoError();
   } finally {
     estado.ocupado = false;
@@ -290,6 +290,11 @@ async function enviarSiguiente() {
   }
   if (seguir && estado.cursor >= lote.elementos.length) { terminarLote(); return false; }
   return seguir;
+}
+
+// Nombre del botón que reanuda, tal como se ve en ese momento.
+function botonSeguir() {
+  return estado.cursor > 0 ? 'Continuar simulación' : 'Iniciar simulación';
 }
 
 function mostrarEstadoError() { $('estado').dataset.tipo = 'error'; }
@@ -323,14 +328,14 @@ function procesarRespuesta(respuesta, contexto) {
     const ultima = estado.lote && estado.cursor >= estado.lote.elementos.length;
     pausar('El caso no se pudo registrar. La simulación quedó en pausa.', ultima
       ? 'n8n respondió, pero la API no guardó el caso. Era la última transacción del lote: comprueba ./fraude estado y pulsa Reiniciar para volver a empezar.'
-      : 'n8n respondió, pero la API no guardó el caso. Comprueba ./fraude estado y pulsa Continuar simulación.');
+      : `n8n respondió, pero la API no guardó el caso. Comprueba ./fraude estado y pulsa ${botonSeguir()}.`);
     mostrarEstadoError();
     return false;
   }
   // Cualquier otra respuesta: la transacción no se evaluó y se reintentará al continuar.
   estado.cursor -= 1;
   const titulo = codigo === 502 ? 'n8n no responde. La simulación quedó en pausa.' : `La API respondió con un error (código ${codigo}). La simulación quedó en pausa.`;
-  pausar(titulo, `${mensajeError(respuesta)} Comprueba los servicios con ./fraude estado y después pulsa Continuar simulación; la transacción se volverá a enviar.`);
+  pausar(titulo, `${mensajeError(respuesta)} Comprueba los servicios con ./fraude estado y después pulsa ${botonSeguir()}; la transacción se volverá a enviar.`);
   mostrarEstadoError();
   return false;
 }
