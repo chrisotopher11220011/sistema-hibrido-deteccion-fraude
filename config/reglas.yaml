@@ -1,0 +1,12 @@
+# Reglas deterministas (docs/spec.md, seccion 10). El motor llega en la fase 2.
+# Ningun umbral va dentro del codigo: se cambia aqui.
+version: "0.1.0"
+reglas:
+  MONTO_ALTO:
+    umbral_monto: 1000        # Se aplica a `Amount` tal cual; el conjunto no indica moneda.
+    alto_riesgo: false
+    datos: [original, sintetico]
+  MONTO_ALTO_UBICACION_INUSUAL:
+    umbral_monto: 1000
+    alto_riesgo: true
+    datos: [sintetico]        # El conjunto original no trae ubicacion.

@@ -1,0 +1,16 @@
+# Datos y artefactos: se generan al ejecutar
+datos/*
+!datos/.gitkeep
+resultados/en_curso/
+resultados/*.zip
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Secretos locales
+.env

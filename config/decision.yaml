@@ -1,0 +1,4 @@
+# Niveles de alerta (docs/spec.md, seccion 8.4). La tabla se aplica en n8n desde la
+# fase 5, con copia en Python para la prueba de paridad.
+niveles: [error_evaluacion, alerta_prioritaria, revision_recomendada, sin_alerta]
+senal_no_evaluable_cuenta_como: no_activada
