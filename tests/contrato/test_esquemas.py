@@ -5,7 +5,7 @@ import copy
 import jsonschema
 import pytest
 import yaml
-from conftest import RAIZ, completar_variables, cumple, ejemplos_spec, esquemas, validar
+from contratos import RAIZ, completar_variables, cumple, ejemplos_spec, esquemas, validar
 
 ESPERADOS = {
     "transaccion",
