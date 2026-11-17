@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:revision",
+  "title": "Cuerpo de POST /casos/{id}/revision",
+  "description": "Decisión del revisor sobre un caso pendiente_revision. El sistema señala para revisión; la persona confirma o descarta la sospecha.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision",
+    "revisor"
+  ],
+  "properties": {
+    "decision": {
+      "enum": [
+        "sospecha_confirmada",
+        "sospecha_descartada"
+      ]
+    },
+    "revisor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "comentario": {
+      "type": "string",
+      "maxLength": 2000,
+      "default": ""
+    }
+  }
+}

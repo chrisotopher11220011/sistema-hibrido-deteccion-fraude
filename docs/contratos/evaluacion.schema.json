@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:evaluacion",
+  "title": "Respuesta de POST /evaluar",
+  "description": "docs/spec.md, sección 8.3. Exactamente estos campos; `modelo` puede añadir `contribuciones` (sección 11). Una puntuación mayor es más anómala; anomalia = puntuacion >= umbral_revision y anomalia_alta = puntuacion >= umbral_prioritaria. Una señal no evaluable cuenta como no activada.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id_transaccion",
+    "reglas",
+    "modelo",
+    "versiones"
+  ],
+  "properties": {
+    "id_transaccion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reglas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "evaluable",
+          "activada",
+          "alto_riesgo",
+          "razon"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evaluable": {
+            "type": "boolean"
+          },
+          "activada": {
+            "type": "boolean"
+          },
+          "alto_riesgo": {
+            "type": "boolean"
+          },
+          "razon": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "modelo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluable",
+        "puntuacion",
+        "umbral_revision",
+        "umbral_prioritaria",
+        "anomalia",
+        "anomalia_alta"
+      ],
+      "properties": {
+        "evaluable": {
+          "type": "boolean"
+        },
+        "puntuacion": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "umbral_revision": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "umbral_prioritaria": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "anomalia": {
+          "type": "boolean"
+        },
+        "anomalia_alta": {
+          "type": "boolean"
+        },
+        "contribuciones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "variable",
+              "peso"
+            ],
+            "properties": {
+              "variable": {
+                "type": "string"
+              },
+              "peso": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "evaluable": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "puntuacion": {
+            "type": "null"
+          },
+          "anomalia": {
+            "const": false
+          },
+          "anomalia_alta": {
+            "const": false
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "puntuacion": {
+            "type": "number"
+          },
+          "umbral_revision": {
+            "type": "number"
+          },
+          "umbral_prioritaria": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "versiones": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reglas",
+        "modelo"
+      ],
+      "properties": {
+        "reglas": {
+          "type": "string"
+        },
+        "modelo": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "null si la API no tiene modelo cargado (ADR 0013)"
+        }
+      }
+    }
+  }
+}

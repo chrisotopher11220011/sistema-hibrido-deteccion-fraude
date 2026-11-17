@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:error",
+  "title": "Respuesta de error de la API",
+  "description": "ADR 0013. Toda respuesta que no es 2xx lleva este cuerpo. En POST /evaluar, cualquier respuesta no 200 hace que n8n marque el caso como error_evaluacion (sección 12).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id_transaccion",
+    "error"
+  ],
+  "properties": {
+    "id_transaccion": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Recuperado del cuerpo si venía, para la trazabilidad"
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tipo",
+        "mensaje",
+        "detalles"
+      ],
+      "properties": {
+        "tipo": {
+          "enum": [
+            "entrada_invalida",
+            "modelo_no_disponible",
+            "error_interno",
+            "caso_no_encontrado",
+            "caso_ya_revisado"
+          ]
+        },
+        "mensaje": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detalles": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}

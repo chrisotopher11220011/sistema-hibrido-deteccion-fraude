@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:transaccion",
+  "title": "Transacción",
+  "description": "docs/spec.md, sección 8.2. Entrada de POST /evaluar y del webhook /webhook/transaccion. La etiqueta real (Class) nunca viaja: cualquier campo extra se rechaza.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id_transaccion",
+    "origen",
+    "monto"
+  ],
+  "properties": {
+    "id_transaccion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "origen": {
+      "enum": [
+        "original",
+        "sintetico"
+      ]
+    },
+    "monto": {
+      "type": "number",
+      "minimum": 0
+    },
+    "variables": {
+      "description": "V1 a V28, todas. Opcional: sin ella el modelo queda «no evaluable».",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "V1",
+            "V2",
+            "V3",
+            "V4",
+            "V5",
+            "V6",
+            "V7",
+            "V8",
+            "V9",
+            "V10",
+            "V11",
+            "V12",
+            "V13",
+            "V14",
+            "V15",
+            "V16",
+            "V17",
+            "V18",
+            "V19",
+            "V20",
+            "V21",
+            "V22",
+            "V23",
+            "V24",
+            "V25",
+            "V26",
+            "V27",
+            "V28"
+          ],
+          "properties": {
+            "V1": {
+              "type": "number"
+            },
+            "V2": {
+              "type": "number"
+            },
+            "V3": {
+              "type": "number"
+            },
+            "V4": {
+              "type": "number"
+            },
+            "V5": {
+              "type": "number"
+            },
+            "V6": {
+              "type": "number"
+            },
+            "V7": {
+              "type": "number"
+            },
+            "V8": {
+              "type": "number"
+            },
+            "V9": {
+              "type": "number"
+            },
+            "V10": {
+              "type": "number"
+            },
+            "V11": {
+              "type": "number"
+            },
+            "V12": {
+              "type": "number"
+            },
+            "V13": {
+              "type": "number"
+            },
+            "V14": {
+              "type": "number"
+            },
+            "V15": {
+              "type": "number"
+            },
+            "V16": {
+              "type": "number"
+            },
+            "V17": {
+              "type": "number"
+            },
+            "V18": {
+              "type": "number"
+            },
+            "V19": {
+              "type": "number"
+            },
+            "V20": {
+              "type": "number"
+            },
+            "V21": {
+              "type": "number"
+            },
+            "V22": {
+              "type": "number"
+            },
+            "V23": {
+              "type": "number"
+            },
+            "V24": {
+              "type": "number"
+            },
+            "V25": {
+              "type": "number"
+            },
+            "V26": {
+              "type": "number"
+            },
+            "V27": {
+              "type": "number"
+            },
+            "V28": {
+              "type": "number"
+            }
+          }
+        }
+      ]
+    },
+    "ubicacion": {
+      "description": "Opcional: sin ella la regla de ubicación queda «no evaluable».",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pais_habitual",
+            "pais_transaccion"
+          ],
+          "properties": {
+            "pais_habitual": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "pais_transaccion": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "if": {
+    "properties": {
+      "origen": {
+        "const": "sintetico"
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "variables": {
+        "type": "null"
+      }
+    }
+  }
+}

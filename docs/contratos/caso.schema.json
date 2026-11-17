@@ -1,0 +1,366 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fraude:contratos:caso",
+  "title": "Caso registrado",
+  "description": "docs/spec.md, sección 8.5. Los casos sin_alerta se cierran solos; los demás quedan pendiente_revision hasta que alguien revisa.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id_caso",
+    "id_transaccion",
+    "origen",
+    "monto",
+    "fecha_procesamiento",
+    "senales",
+    "puntuacion",
+    "nivel",
+    "razones",
+    "explicacion",
+    "notificacion",
+    "estado",
+    "decision_final",
+    "revision",
+    "versiones"
+  ],
+  "properties": {
+    "id_caso": {
+      "type": "string",
+      "pattern": "^c-[0-9a-f]{12}$"
+    },
+    "id_transaccion": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 100
+    },
+    "origen": {
+      "enum": [
+        "original",
+        "sintetico",
+        null
+      ]
+    },
+    "monto": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "fecha_procesamiento": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
+    "senales": {
+      "description": "Respuesta de /evaluar tal cual; null si la evaluación falló",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "urn:fraude:contratos:evaluacion"
+        }
+      ]
+    },
+    "puntuacion": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "nivel": {
+      "enum": [
+        "error_evaluacion",
+        "alerta_prioritaria",
+        "revision_recomendada",
+        "sin_alerta"
+      ]
+    },
+    "razones": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "explicacion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "texto",
+        "origen"
+      ],
+      "properties": {
+        "texto": {
+          "type": "string"
+        },
+        "origen": {
+          "enum": [
+            "plantilla",
+            "llm"
+          ]
+        },
+        "modelo": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Modelo del LLM, si se usó (sección 14)"
+        },
+        "duracion_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "notificacion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canal",
+        "estado"
+      ],
+      "properties": {
+        "canal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "estado": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detalle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "versiones": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reglas",
+        "modelo",
+        "flujo"
+      ],
+      "properties": {
+        "reglas": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "modelo": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "flujo": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "estado": {
+      "enum": [
+        "cerrado",
+        "pendiente_revision",
+        "revisado"
+      ]
+    },
+    "decision_final": {
+      "enum": [
+        "sin_alerta",
+        "pendiente",
+        "sospecha_confirmada",
+        "sospecha_descartada"
+      ]
+    },
+    "revision": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "revisor",
+            "comentario",
+            "fecha"
+          ],
+          "properties": {
+            "revisor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "comentario": {
+              "type": "string"
+            },
+            "fecha": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "nivel": {
+            "not": {
+              "const": "sin_alerta"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "razones": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "nivel": {
+            "not": {
+              "const": "error_evaluacion"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "id_transaccion",
+          "origen",
+          "monto",
+          "senales"
+        ],
+        "properties": {
+          "id_transaccion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "origen": {
+            "enum": [
+              "original",
+              "sintetico"
+            ]
+          },
+          "monto": {
+            "type": "number"
+          },
+          "senales": {
+            "$ref": "urn:fraude:contratos:evaluacion"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "estado": {
+            "const": "cerrado"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "nivel": {
+            "const": "sin_alerta"
+          },
+          "decision_final": {
+            "const": "sin_alerta"
+          },
+          "revision": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "estado": {
+            "const": "pendiente_revision"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "nivel": {
+            "not": {
+              "const": "sin_alerta"
+            }
+          },
+          "decision_final": {
+            "const": "pendiente"
+          },
+          "revision": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "estado": {
+            "const": "revisado"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "nivel": {
+            "not": {
+              "const": "sin_alerta"
+            }
+          },
+          "decision_final": {
+            "enum": [
+              "sospecha_confirmada",
+              "sospecha_descartada"
+            ]
+          },
+          "revision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "revisor",
+              "comentario",
+              "fecha"
+            ],
+            "properties": {
+              "revisor": {
+                "type": "string",
+                "minLength": 1
+              },
+              "comentario": {
+                "type": "string"
+              },
+              "fecha": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
