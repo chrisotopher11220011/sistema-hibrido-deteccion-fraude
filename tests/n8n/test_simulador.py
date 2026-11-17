@@ -58,13 +58,17 @@ def _responder(nombre: str, cuerpo: str, codigo=None) -> dict:
     return _nodo(nombre, "respondToWebhook", 1.1, parametros)
 
 
+def _destino(nodo: str) -> dict:
+    return {"node": nodo, "type": "main", "index": 0}
+
+
 def _flujo(nodos: list[dict], conexiones: dict[str, list[list[str]]]) -> dict:
     return {
         "id": "SimPrueba0000001",
         "name": "Prueba",
         "nodes": nodos,
         "connections": {
-            origen: {"main": [[{"node": d, "type": "main", "index": 0} for d in s] for s in salidas]}
+            origen: {"main": [[_destino(d) for d in salida] for salida in salidas]}
             for origen, salidas in conexiones.items()
         },
         "settings": {"executionOrder": "v1"},
@@ -99,7 +103,8 @@ def test_set_e_if_eligen_la_rama_y_responden(simulador):
         ],
         {"Webhook": [["Calcular"]], "Calcular": [["¿Grande?"]], "¿Grande?": [["Si"], ["No"]]},
     )
-    assert simulador(flujo, {"n": 50})["respuesta"] == {"codigo": 200, "cuerpo": {"rama": "si", "n": 50}}
+    esperada = {"codigo": 200, "cuerpo": {"rama": "si", "n": 50}}
+    assert simulador(flujo, {"n": 50})["respuesta"] == esperada
     resultado = simulador(flujo, {"n": 1})
     assert resultado["respuesta"] == {"codigo": 202, "cuerpo": {"rama": "no"}}
     assert resultado["recorrido"] == ["Webhook", "Calcular", "¿Grande?", "No"]
@@ -217,11 +222,11 @@ def test_switch_primera_regla_y_salida_extra(simulador, a, b, c, esperada):
 # --- HTTP Request -------------------------------------------------------------------------
 
 
-def _flujo_http(**ajustes) -> dict:
+def _flujo_http(**ajuste) -> dict:
     return _flujo(
         [
             WEBHOOK,
-            _http("Pedir", "=http://api:8000/x/{{ $json.body.id }}", "={{ $json.body }}", **ajustes),
+            _http("Pedir", "=http://api:8000/x/{{ $json.body.id }}", "={{ $json.body }}", **ajuste),
             _responder("Bien", "={{ { codigo: $json.statusCode, cuerpo: $json.body } }}"),
             _responder("Mal", "={{ { fallo: $json.error.message, entrada: $json.body } }}", 502),
         ],
@@ -287,9 +292,7 @@ def test_http_max_tries_se_acota_como_en_n8n(simulador):
 
 
 def test_http_sin_salida_de_error_detiene_el_flujo(simulador):
-    resultado = simulador(
-        _flujo_http(), {"id": "1"}, {"Pedir": [{"error": {"message": "caida"}}]}
-    )
+    resultado = simulador(_flujo_http(), {"id": "1"}, {"Pedir": [{"error": {"message": "caida"}}]})
     assert resultado["respuesta"] is None
     assert "caida" in resultado["fallo_flujo"]
 
@@ -304,9 +307,7 @@ def test_http_sin_respuesta_simulada_es_un_error_del_simulador(simulador):
 
 def test_expresion_con_doble_llave_interna_se_rechaza(simulador):
     # n8n cierra la expresion en el primer «}}»: `{a: {b: 1}}` se partiria.
-    flujo = _flujo(
-        [WEBHOOK, _responder("R", "={{ {a: {b: 1}} }}")], {"Webhook": [["R"]]}
-    )
+    flujo = _flujo([WEBHOOK, _responder("R", "={{ {a: {b: 1}} }}")], {"Webhook": [["R"]]})
     with pytest.raises(ErrorSimulador):
         simulador(flujo, {})
 
