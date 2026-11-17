@@ -113,7 +113,7 @@ def _ejecutar_pasos(muestra: bool = False, llm: bool = False) -> list[dict]:
     Con `llm`, primero deja listo el LLM local: si falla, los demas pasos siguen y las
     explicaciones usan la plantilla.
     """
-    pasos = [_paso("llm", muestra)] if llm else []
+    pasos = [_paso("llm", False)] if llm else []  # El LLM no depende de la muestra.
     for paso in PASOS:
         if paso not in PASOS_FUTUROS:
             pasos.append(_paso(paso, muestra))

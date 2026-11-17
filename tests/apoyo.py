@@ -169,6 +169,10 @@ class OllamaFalso:
                          "completed": 500},
                         {"status": "pulling d8b0", "digest": "sha256:d8b0", "total": 1000,
                          "completed": 1000},
+                        {"status": "pulling 5c1e", "digest": "sha256:5c1e", "total": 100,
+                         "completed": 0},
+                        {"status": "pulling 5c1e", "digest": "sha256:5c1e", "total": 100,
+                         "completed": 100},
                         {"status": "verifying sha256 digest"},
                         {"status": "success"},
                     ]  # fmt: skip

@@ -195,6 +195,8 @@ def test_la_comprobacion_no_depende_de_tildes_ni_mayusculas():
         (BUENO + " Se confirma el fraude.", "afirmacion_prohibida"),
         (BUENO + " Es fraudulenta.", "afirmacion_prohibida"),
         (BUENO + " x" * 400, "demasiado_largo"),
+        (BUENO + " Superó el umbral por 0.072 puntos.", "cifra_no_calculada:0.072"),
+        (BUENO.replace("1250.00", "1350.00"), "cifra_no_calculada:1350.00"),
     ],
 )
 def test_la_comprobacion_rechaza(texto, fallo):
@@ -344,3 +346,11 @@ def test_llm_activo_lo_decide_la_variable_de_entorno(monkeypatch):
     assert explicacion.llm_activo() is False
     monkeypatch.setenv("FRAUDE_LLM", "activo")
     assert explicacion.llm_activo() is True
+
+
+def test_las_cifras_del_mensaje_pueden_citarse_con_otro_formato():
+    texto = (
+        "Alerta prioritaria: MONTO_ALTO porque el monto 1250 supera 1000; la puntuación 0,812 "
+        "supera el umbral prioritario 0.74. Pesaron V14 (0.21) y V4. Una persona debe revisarla."
+    )
+    assert explicacion.comprobar(texto, "alerta_prioritaria", _senales(), CONFIG)["valida"]

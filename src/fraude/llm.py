@@ -56,9 +56,14 @@ def _gb(n: float) -> str:
 
 
 def _descargar(base: str, modelo: str, tiempo_limite: float) -> None:
-    """`POST /api/pull` con progreso cada 10 %. Termina en `success` o lanza `ErrorLlm`."""
+    """`POST /api/pull` con progreso cada 10 %. Termina en `success` o lanza `ErrorLlm`.
+
+    Ollama descarga el modelo en varias capas: el progreso suma todas las vistas hasta ahora,
+    para que no vuelva a 0 % en cada capa.
+    """
     ultimo_decil = -1
     estado_final = None
+    capas: dict[str, tuple[int, int]] = {}
     with _abrir(f"{base}/api/pull", {"model": modelo, "stream": True}, tiempo_limite) as r:
         for linea in r:
             if not linea.strip():
@@ -67,10 +72,14 @@ def _descargar(base: str, modelo: str, tiempo_limite: float) -> None:
             if "error" in evento:
                 raise ErrorLlm(f"La descarga de {modelo} fallo: {evento['error']}")
             estado_final = evento.get("status")
-            total, hecho = evento.get("total"), evento.get("completed")
-            if total and hecho is not None:
+            if evento.get("digest") and evento.get("total"):
+                capas[evento["digest"]] = (int(evento["total"]), int(evento.get("completed") or 0))
+            if capas and evento.get("digest"):
+                total = sum(t for t, _ in capas.values())
+                hecho = sum(min(h, t) for t, h in capas.values())
                 decil = int(hecho * 10 // total)
-                if decil != ultimo_decil:
+                # Al aparecer una capa nueva el total crece: el progreso nunca retrocede.
+                if decil > ultimo_decil:
                     ultimo_decil = decil
                     print(
                         f"[llm] Descargando {modelo}: {decil * 10} % "

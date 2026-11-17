@@ -13,6 +13,8 @@ Esquemas JSON (borrador 2020-12) de la sección 8 de `docs/spec.md`. Son el acue
 | `error.schema.json` | Cuerpo de toda respuesta que no es 2xx | ADR 0013 |
 | `salud.schema.json` | Respuesta de `GET /salud` | Sección 8.6 |
 | `error_flujo.schema.json` | Respuesta 502 de los webhooks de n8n cuando la API no guardó el resultado | Sección 8.7; ADR 0014 |
+| `redaccion_pedida.schema.json` | Cuerpo de `POST /explicacion`: nivel ya decidido y señales de `/evaluar` | Sección 14; ADR 0016 |
+| `redaccion.schema.json` | Respuesta de `POST /explicacion`: texto del LLM comprobado, o motivo para usar la plantilla | Sección 14; ADR 0016 |
 | `lote.schema.json` | Respuesta de `GET /simulacion/lote`: lote de demostración con la etiqueta aparte de la transacción | Sección 8.6; ADR 0014 y 0015 |
 
 Cada esquema tiene un `$id` de la forma `urn:fraude:contratos:<nombre>`; `caso` y `caso_nuevo` usan `evaluacion` por referencia.
@@ -30,6 +32,11 @@ La sección 8 fija la transacción, la respuesta de `/evaluar`, los niveles y lo
 
 - **`POST /webhook/transaccion`** recibe una transacción (sección 8.2) y responde **200 con el caso registrado** (esquema `caso`), también cuando el nivel es `error_evaluacion`. Si la API no guarda el caso, responde **502** con `error_flujo`: `error.tipo = caso_no_registrado` y el caso calculado en `caso`. Un cuerpo que no es JSON válido lo rechaza n8n con 422 antes de ejecutar el flujo y no deja caso.
 - **`POST /webhook/revision`** recibe `{"id_caso", "decision", "revisor", "comentario"}`. Si `id_caso` no tiene la forma `c-` y 12 cifras hexadecimales, responde **422** (esquema `error`) sin llamar a la API. Si no, repite el código y el cuerpo de `POST /casos/{id}/revision` (200, 404, 409, 422). Si la API no responde, **502** con `error_flujo` (`revision_no_registrada`).
+
+## Explicación con el LLM local (ADR 0016)
+
+- **`POST /explicacion`** recibe `{"id_transaccion", "nivel", "senales"}` (las alertas exigen señales) y responde siempre **200** con `redaccion`: `origen: llm` con el texto que pasó la comprobación automática, o `origen: plantilla` con `texto: null` y `respaldo.motivo` (`llm_desactivado`, `nivel_sin_redaccion`, `tiempo_agotado`, `error_llm` o `comprobacion_fallida`). Un cuerpo inválido es 422 con `error`.
+- **`explicacion` del caso** admite, opcionales, `respaldo` (el motivo anterior, o `error_api` si n8n no obtuvo redacción) y `comprobacion` (`{"valida", "fallos"}`). Con `origen: plantilla`, el texto es la plantilla de n8n.
 
 ## Pruebas
 

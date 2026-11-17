@@ -24,6 +24,43 @@ import urllib.request
 # Identificadores con forma de regla: MAYUSCULAS_CON_GUIONES (al menos un guion bajo).
 _FORMA_DE_REGLA = re.compile(r"(?<![A-Za-z0-9_])[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?![A-Za-z0-9_])")
 _VARIABLE = re.compile(r"(?<![A-Za-z0-9_])V([1-9]|1[0-9]|2[0-8])(?![A-Za-z0-9_])")
+# Cifras sueltas: no las que forman parte de un identificador (V14) ni de una palabra.
+_CIFRA = re.compile(r"(?<![\w.,])\d+(?:[.,]\d+)*(?![\w])")
+# Enteros pequenos («las 3 variables») se admiten aunque no esten en el mensaje.
+_ENTERO_LIBRE = 10
+
+
+def _leer_cifra(texto: str) -> tuple[float, int] | None:
+    """Valor y decimales de una cifra escrita con punto o coma decimal."""
+    if "." in texto and "," in texto:
+        texto = texto.replace(".", "").replace(",", ".")
+    else:
+        texto = texto.replace(",", ".")
+    if texto.count(".") > 1:
+        return None
+    decimales = len(texto.split(".")[1]) if "." in texto else 0
+    try:
+        return float(texto), decimales
+    except ValueError:
+        return None
+
+
+def _cifras_inventadas(texto: str, mensaje: str) -> list[str]:
+    """Cifras del texto que no son (un redondeo de) alguna cifra del mensaje al LLM."""
+    permitidas = [c[0] for c in map(_leer_cifra, _CIFRA.findall(mensaje)) if c]
+    inventadas = []
+    for crudo in _CIFRA.findall(texto):
+        leida = _leer_cifra(crudo)
+        if leida is None:
+            inventadas.append(crudo)
+            continue
+        valor, decimales = leida
+        if decimales == 0 and valor <= _ENTERO_LIBRE:
+            continue
+        margen = 0.5 * 10**-decimales + 1e-9
+        if not any(abs(valor - p) <= margen for p in permitidas):
+            inventadas.append(crudo)
+    return inventadas
 
 
 def llm_activo() -> bool:
@@ -111,7 +148,8 @@ def comprobar(texto: str, nivel: str, senales: dict, config: dict) -> dict:
 
     Devuelve `{"valida", "fallos"}`. Fallos posibles: `vacio`, `razonamiento_visible`,
     `demasiado_largo`, `nivel_no_mencionado`, `nivel_ajeno:<nivel>`,
-    `regla_no_activada:<id>`, `regla_inexistente:<id>`, `variable_no_calculada:<Vn>` y
+    `regla_no_activada:<id>`, `regla_inexistente:<id>`, `variable_no_calculada:<Vn>`,
+    `cifra_no_calculada:<cifra>` (una cifra que no esta en el mensaje al LLM, ni redondeada) y
     `afirmacion_prohibida:<patron>`.
     """
     reglas_config = config["comprobacion"]
@@ -146,6 +184,10 @@ def comprobar(texto: str, nivel: str, senales: dict, config: dict) -> dict:
     calculadas = {c["variable"] for c in (modelo.get("contribuciones") or [])}
     for variable in sorted({f"V{m.group(1)}" for m in _VARIABLE.finditer(texto)} - calculadas):
         fallos.append(f"variable_no_calculada:{variable}")
+
+    mensaje = mensajes(nivel, senales, config)[1]["content"]
+    for cifra in _cifras_inventadas(texto, mensaje):
+        fallos.append(f"cifra_no_calculada:{cifra}")
 
     for patron in reglas_config.get("afirmaciones_prohibidas", []):
         if re.search(patron, normal):

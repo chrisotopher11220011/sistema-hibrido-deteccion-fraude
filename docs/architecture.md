@@ -14,92 +14,35 @@ Página de simulación (navegador)
 | Reglas deterministas       <--------------- |                                     |
 | Isolation Forest (puntuación) ----------->  | 3. Clasificar nivel de alerta       |
 | Registro de casos (SQLite) <--------------- | 4. Registrar caso                   |
-+-----------------------------------+        | 5. Explicación (plantilla o LLM)    |
-                                             | 6. Notificación de prueba           |
-        LLM local (opcional) <--------------- | 7. Revisión humana (otro webhook)   |
-                                             +-------------------------------------+
+| Redacción de la explicación <-------------- | 5. Explicación (plantilla o LLM)    |
++-----------------------------------+        | 6. Notificación de prueba           |
+        |                                    | 7. Revisión humana (otro webhook)   |
+        v                                    +-------------------------------------+
+LLM local (opcional, servicio llm)
 ```
 
-## Hoy (versión 0.4.0)
+## Hoy (versión 0.7.0)
 
 ```
 Computador de ejecución (Omarchy 4)
 │
 ├─ ./fraude ............ guion bash; único que habla con Docker (con sudo si hace falta)
-│     ├─ escribe resultados/en_curso/: anfitrion.json, registros/, capturas/
-│     └─ llama a Compose
+│     ├─ escribe resultados/en_curso/: anfitrion.json, registros/, capturas/, .llm
+│     └─ llama a Compose (con --llm: perfil «llm» y, si Docker ve la gráfica, compose.gpu.yaml)
 │
 └─ Docker Compose (proyecto «fraude»)
-      ├─ api ............ FastAPI · 127.0.0.1:8000 · GET /salud, POST /evaluar,
-      │                   POST /casos, GET /casos, POST /casos/{id}/revision
+      ├─ api ............ FastAPI · 127.0.0.1:8000 · /salud, /evaluar, /explicacion,
+      │                   /casos, /casos/{id}/revision, página en / y /simulacion/*
       │                   carga y recarga el modelo de datos/modelo/; casos en SQLite
-      ├─ n8n ............ n8n 2.47.7 · 127.0.0.1:5678 · GET /webhook/ping
+      ├─ n8n ............ n8n 2.47.7 · 127.0.0.1:5678 · ping, transaccion, revision
       │                   arranque.sh: importar flujos → publicar → n8n start
+      ├─ llm ............ Ollama 0.40.16 (perfil «llm», sin puerto) · qwen3.5:4b-q4_K_M
       └─ tareas ......... línea de comandos (perfil «tareas», sin puerto)
-                          preparar: datos, partición, análisis exploratorio, sintéticos
-                          entrenar: Isolation Forest y umbrales; evaluar: sección 15
-                          comprueba api y n8n por la red interna y reúne la evidencia
-```
+                          preparar, entrenar, evaluar, demostrar, llm y evidencia
 
-### Datos (fase 2)
-
-```
-OpenML 1597 (ARFF, MD5 publicada)  ─┐
-datos/crudos/creditcard.csv (Kaggle, a mano) ─┴─> leer y verificar (conteos, MD5, huella SHA-256)
-                                                     │
-                     partición estratificada 56/14/30, índices guardados
-                       ├─ ajuste ──────> análisis exploratorio (resultados/en_curso/eda/)
-                       ├─ validación ──> umbrales (entrenar) y analisis_errores/ (evaluar)
-                       └─ prueba ──────> solo métricas agregadas (evaluar)
-
-generador sintético ──> datos/sinteticos/ubicacion.json ──> comprobación funcional de la regla
-                        (origen «sintetico», sin variables; nunca junto a los originales)
-```
-
-| Carpeta | Contenido |
-|---|---|
-| `datos/crudos/`, `datos/preparados/` | Conjunto real, su huella, la partición y `origen.json` |
-| `datos/muestra/` | Muestra para pruebas (N1 y N2), con la misma estructura |
-| `datos/sinteticos/` | Transacciones sintéticas de ubicación |
-| `datos/modelo/`, `datos/muestra/modelo/` | Artefacto del modelo (`modelo.joblib`) y su `modelo.json` |
-| `datos/casos/` | Registro de casos de la API (`casos.sqlite`) |
-
-| Módulo de `src/fraude/` | Responsabilidad |
-|---|---|
-| `transaccion.py` | Forma de la transacción (sección 8.2) |
-| `reglas.py` | Reglas deterministas y sus razones (sección 10) |
-| `datos.py` | Lectura de ARFF y CSV, descarga, huellas y conteos |
-| `particion.py` | Partición estratificada |
-| `muestra.py`, `sinteticos.py` | Muestra para pruebas y transacciones sintéticas |
-| `eda.py` | Análisis exploratorio y figuras de la parte de ajuste |
-| `preparar.py` | Orquesta el paso y escribe `datos.json` |
-| `modelo.py` | Isolation Forest, puntuación, umbrales y artefacto (sección 11, ADR 0008) |
-| `contribuciones.py` | Contribución por variable con SHAP para árboles (ADR 0012) |
-| `decision.py` | Copia en Python de la tabla de decisión (sección 8.4) |
-| `metricas.py` | Métricas con pesos, *bootstrap* estratificado e intervalos |
-| `entrenar.py` | Orquesta el entrenamiento y escribe `modelo.json` |
-| `evaluar.py`, `comparativa.py`, `figuras.py`, `graficas.py` | Protocolo de la sección 15, `metricas.json`, `comparativa.md`, figuras y análisis de errores |
-| `api.py` | Rutas de la API (sección 8.6) y manejo de errores (ADR 0013) |
-| `servicio_modelo.py` | Carga, recarga y uso del modelo en la API (ADR 0013) |
-| `evaluacion.py` | Transacción → respuesta de `/evaluar` (sección 8.3) |
-| `errores.py` | Cuerpo de error común a todas las rutas |
-| `casos.py`, `registro.py` | Forma de los casos y su registro en SQLite (sección 8.5, ADR 0005) |
-
-### API y casos (fase 4)
-
-```
-transacción ──> POST /evaluar ──> validación (contrato 8.2) ──── inválida ──> 422 entrada_invalida
-                                     │
-                                     ├─ reglas (config/reglas.yaml)
-                                     └─ ¿trae variables? ── no ──> modelo «no evaluable»
-                                              │ sí
-                                              ├─ sin modelo cargado ──> 503 modelo_no_disponible
-                                              └─ Isolation Forest + umbrales de modelo.json
-                                                  └─ si hay anomalía: contribuciones SHAP
-                                     ──> 200 con el contrato 8.3
-
-n8n (fase 5) ──> POST /casos ──> datos/casos/casos.sqlite ──> casos.csv y revisiones.csv
-página (fase 6) ──> POST /casos/{id}/revision                  (en la evidencia)
+n8n ──> POST /evaluar ──> «Clasificar nivel» ──> (alertas) POST /explicacion ──> llm
+    ──> POST /casos ──> datos/casos/casos.sqlite ──> casos.csv, revisiones.csv, explicaciones.json
+página ──> /simulacion/* ──> webhooks de n8n
 ```
 
 Cualquier respuesta de `/evaluar` que no sea 200 hace que n8n marque el caso `error_evaluacion`. Los contratos están en `docs/contratos/`.
@@ -118,5 +61,6 @@ Cualquier respuesta de `/evaluar` que no sea 200 hace que n8n marque el caso `er
 - Los puertos se publican solo en `127.0.0.1`.
 - `api` y `tareas` corren con el usuario de quien ejecuta, para que `datos/` y `resultados/` queden a su nombre.
 - La página nunca llama a n8n directamente: lo hace la API.
+- El LLM solo redacta, después de clasificar, y siempre con respaldo por plantilla (ADR 0016).
 - La tabla de decisión vive en n8n, con copia en Python y prueba de paridad.
 - Lo que solo el anfitrión puede ver (sistema, registros de Docker, capturas) lo recoge `./fraude`; los contenedores no acceden a Docker.

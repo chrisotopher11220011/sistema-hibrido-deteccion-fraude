@@ -6,7 +6,7 @@ No bloquea operaciones reales ni está pensado para producción. El sistema señ
 
 ## Estado
 
-**Versión 0.6.0 — Fase 6, página de simulación.** Además de los cimientos, los datos y las reglas, el aprendizaje automático, la API con registro de casos y los flujos de n8n, la página de `http://localhost:8000` simula la verificación de transacciones: envía el lote de demostración por n8n a través de la API, muestra el nivel de cada transacción con sus razones y su puntuación frente a los umbrales, y después la etiqueta real; lleva contadores, matriz de confusión del lote mostrado, gráficas en vivo, bandeja de revisión humana y transacción manual. Tiene temas claro y oscuro, modo presentación y uso completo con teclado. El sistema **señala para revisión**; no confirma fraude. Cada sesión queda en `simulacion.json`. Las cifras de desempeño solo existirán cuando se ejecute con los datos reales en el computador de ejecución (N3): lo calculado en la CI usa la muestra para pruebas y no es un resultado.
+**Versión 0.7.0 — Fase 7, LLM local (opcional).** Sobre la versión 0.6.0 (cimientos, datos y reglas, aprendizaje automático, API con registro de casos, flujos de n8n y página de simulación), `./fraude todo --llm` activa un modelo de lenguaje local (Ollama con `qwen3.5:4b-q4_K_M`, en la gráfica NVIDIA si Docker está preparado y si no en el procesador) que **redacta** la explicación de cada alerta para quien revisa. No decide ni cambia el nivel. Cada texto pasa una comprobación automática y, si el modelo falla, tarda o el texto no la pasa, queda la explicación por plantilla. Sin `--llm`, todo funciona como antes. El sistema **señala para revisión**; no confirma fraude. Las cifras de desempeño solo existirán cuando se ejecute con los datos reales en el computador de ejecución (N3): lo calculado en la CI usa la muestra para pruebas y no es un resultado.
 
 El avance detallado está en [`docs/ESTADO.md`](docs/ESTADO.md) y los cambios en [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -26,6 +26,7 @@ La guía paso a paso, con lo que debería verse en cada momento, está en [`EJEC
 |---|---|
 | `./fraude todo` | Arranca los servicios, ejecuta los pasos que existen y reúne la evidencia |
 | `./fraude todo --muestra` | Lo mismo con datos de prueba generados, sin descargar el conjunto real (sus cifras no se reportan) |
+| `./fraude todo --llm` | Además, el LLM local redacta las explicaciones de las alertas. La primera vez descarga unos 6,7 GB |
 | `./fraude preparar` | Solo el paso de datos: descarga, verificación, partición y análisis exploratorio |
 | `./fraude entrenar` | Entrena Isolation Forest con la parte de ajuste y elige los umbrales en validación |
 | `./fraude evaluar` | Métricas sobre la parte de prueba, comparativa, figuras y análisis de errores de validación |

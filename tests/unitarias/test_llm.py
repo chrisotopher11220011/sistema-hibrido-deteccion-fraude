@@ -60,6 +60,10 @@ def test_descarga_precarga_y_anota_el_modelo_en_la_grafica(raiz, capsys):
     }
     salida = capsys.readouterr().out
     assert "50 %" in salida and "100 %" in salida
+    # Un solo recorrido de 0 a 100 %, aunque Ollama descargue varias capas.
+    lineas = [linea for linea in salida.splitlines() if "Descargando" in linea]
+    porcentajes = [int(linea.split(": ")[1].split(" %")[0]) for linea in lineas]
+    assert porcentajes == sorted(porcentajes)
 
 
 def test_sin_grafica_lo_anota_como_procesador(raiz):
