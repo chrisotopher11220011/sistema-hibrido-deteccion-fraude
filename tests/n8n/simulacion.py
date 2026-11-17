@@ -52,3 +52,14 @@ def simular(flujo: dict | str, cuerpo, respuestas: dict | None = None) -> dict:
     if proceso.returncode != 0:
         raise ErrorSimulador(proceso.stderr.strip() or proceso.stdout.strip())
     return json.loads(proceso.stdout)
+
+
+def validar_contrato(nombre: str, instancia) -> None:
+    """Valida contra `docs/contratos/<nombre>.schema.json` (utilidades de tests/contrato)."""
+    import importlib.util
+
+    ruta = RAIZ / "tests" / "contrato" / "contratos.py"
+    especificacion = importlib.util.spec_from_file_location("contratos_fraude", ruta)
+    modulo = importlib.util.module_from_spec(especificacion)
+    especificacion.loader.exec_module(modulo)
+    modulo.validar(nombre, instancia)
