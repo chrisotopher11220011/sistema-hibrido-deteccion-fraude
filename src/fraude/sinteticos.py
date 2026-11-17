@@ -35,10 +35,8 @@ def generar(
         else:
             monto = rng.uniform(1.0, umbral_monto)
         habitual = str(rng.choice(paises))
-        if distinto:
-            actual = str(rng.choice([p for p in paises if p != habitual]))
-        else:
-            actual = habitual
+        otros = [p for p in paises if p != habitual]
+        actual = str(rng.choice(otros)) if distinto else habitual
         transacciones.append(
             {
                 "id_transaccion": f"s-{i + 1:05d}",

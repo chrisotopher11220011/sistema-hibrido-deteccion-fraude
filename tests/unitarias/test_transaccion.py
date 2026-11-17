@@ -18,7 +18,7 @@ EJEMPLO = {
 
 
 def test_variables_son_v1_a_v28():
-    assert VARIABLES == tuple(f"V{i}" for i in range(1, 29))
+    assert tuple(f"V{i}" for i in range(1, 29)) == VARIABLES
 
 
 def test_acepta_el_ejemplo_del_contrato():

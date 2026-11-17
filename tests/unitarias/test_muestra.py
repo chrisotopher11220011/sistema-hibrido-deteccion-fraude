@@ -6,7 +6,7 @@ from fraude.muestra import COLUMNAS, generar
 
 
 def test_columnas_del_conjunto_real():
-    assert COLUMNAS == ("Time", *[f"V{i}" for i in range(1, 29)], "Amount", "Class")
+    assert ("Time", *[f"V{i}" for i in range(1, 29)], "Amount", "Class") == COLUMNAS
     df = generar(500, 10, semilla=1)
     assert tuple(df.columns) == COLUMNAS
 
