@@ -6,6 +6,26 @@ Cada entrada indica su nivel de verificación: N1 (entorno de desarrollo), N2 (G
 
 ## [Sin publicar]
 
+## [0.4.0] - 2026-11-17
+
+Fase 4, API y casos. Lo comprobado en la CI usa la muestra para pruebas: confirma que la API funciona y cumple los contratos, no mide la detección de fraude.
+
+### Añadido
+
+- `POST /evaluar` con el contrato 8.3: reglas, puntuación de Isolation Forest frente a los umbrales de `modelo.json`, `anomalia` y `anomalia_alta`, y las variables que más pesaron cuando hay anomalía (N1; N2 con la muestra).
+- La API carga el modelo que deja `entrenar` y lo recarga cuando cambia, sin reiniciarse; `FRAUDE_MODELO` elige `auto`, `real` o `muestra`. `/salud` informa si hay modelo, cuál y por qué no (ADR 0013) (N1; N2 con la muestra).
+- Respuesta de error común a todas las rutas. Una entrada inválida responde 422 y una transacción con variables sin modelo cargado responde 503, para que n8n marque `error_evaluacion` (ADR 0013) (N1; N2).
+- Registro de casos en SQLite (`datos/casos/casos.sqlite`): `POST /casos`, `GET /casos` y `POST /casos/{id}/revision`. Los casos `sin_alerta` se cierran solos; los demás quedan pendientes hasta una única revisión (ADR 0005 y 0013) (N1; N2).
+- Esquemas JSON de los contratos en `docs/contratos/`, con pruebas de contrato sobre los ejemplos de `docs/spec.md` y sobre las respuestas reales de la API (`tests/contrato/`) (N1; N2).
+- La evidencia trae `casos.csv` y `revisiones.csv` (N1; N2).
+- ADR 0013: carga del modelo en la API, respuestas de error y forma de los casos.
+
+### Cambiado
+
+- `GET /salud` informa el estado real del modelo en lugar de «aún no existe».
+- `contribuciones.Explicador` permite reutilizar el explicador SHAP de un modelo cargado.
+- Dependencia de desarrollo nueva: `jsonschema`.
+
 ## [0.3.0] - 2026-11-17
 
 Fase 3, aprendizaje automático. Todo lo comprobado aquí usa la muestra para pruebas: confirma que el procedimiento funciona, no mide la detección de fraude. Las cifras reales salen solo de N3 (punto de prueba B).

@@ -43,3 +43,11 @@ Quien desarrolla no ejecuta el sistema completo. Esta lista dice qué se da por 
 | S19 | Con los datos reales, la validación tiene fraudes suficientes para elegir los umbrales (se esperan unos 69) y la partición temporal tiene fraudes en sus tres tramos | `modelo.json` (`datos.fraudes_validacion`) y `metricas.json` (`temporal.partes`) | Pendiente. Si un tramo temporal no tiene fraudes, la partición temporal queda como `fallo` con su motivo y el resto sigue |
 | S20 | `k = 100` es un cupo razonable de casos para un revisor | `metricas.json` (`protocolo.k_revision`) | Pendiente. Valor del manual de la ULB (por día y por tarjetas); aquí se aplica a transacciones. Se revisa con el equipo antes de la ponencia |
 
+
+## Supuestos nuevos de la fase 4
+
+| N.º | Supuesto | Cómo se comprueba | Estado |
+|---|---|---|---|
+| S21 | La API, que arranca antes que `entrenar`, ve por el volumen `datos/` el modelo que deja `tareas` y lo carga sin reiniciarse | N2: `tests/punta_a_punta/comprobar_api.py` tras `todo --muestra`. N3: `/salud` con `"cargado": true` y `casos.csv` con `version_modelo` | Pendiente de N2. Comprobado en N1 con la API en marcha y el modelo entrenado después |
+| S22 | SQLite funciona en el volumen `datos/` de Omarchy 4 con el usuario de quien ejecuta (bloqueos de archivo incluidos) | N2 en Linux de GitHub; N3: `casos.csv` y `revisiones.csv` en la evidencia del punto C | Pendiente |
+| S23 | Evaluar una transacción con el modelo, incluidas las contribuciones SHAP de una anomalía, tarda mucho menos que el tiempo límite de n8n | N3: latencias de `flujo.json` (fase 5) | Pendiente. En N1, con la muestra, una anomalía se explica en milisegundos; con el modelo real puede variar |

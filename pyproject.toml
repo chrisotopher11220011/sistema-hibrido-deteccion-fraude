@@ -1,6 +1,6 @@
 [project]
 name = "fraude"
-version = "0.3.0"
+version = "0.4.0"
 description = "Prototipo academico: deteccion hibrida de fraude con reglas, aprendizaje automatico y n8n"
 readme = "README.md"
 requires-python = ">=3.12"

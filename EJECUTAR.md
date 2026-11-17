@@ -2,7 +2,7 @@
 
 Esta guía es para quien ejecuta el sistema en su computador. No hace falta saber programar ni instalar nada: Omarchy 4 ya trae Docker, Docker Compose, Git y el navegador.
 
-**Versión 0.3.0 — punto de prueba B.** Comprueba que el sistema arranca en tu equipo, descarga los datos reales, entrena el modelo de detección de anomalías (Isolation Forest) y calcula las primeras métricas. Toma unos diez minutos, más las descargas de la primera vez (imágenes de Docker y unos 150 MB de datos). Aún no hay página de simulación.
+**Versión 0.4.0 — punto de prueba B.** Comprueba que el sistema arranca en tu equipo, descarga los datos reales, entrena el modelo de detección de anomalías (Isolation Forest) y calcula las primeras métricas. Toma unos diez minutos, más las descargas de la primera vez (imágenes de Docker y unos 150 MB de datos). Aún no hay página de simulación. Desde la versión 0.4.0, la dirección `http://localhost:8000/salud` también dice si la API cargó el modelo entrenado.
 
 ## Antes de empezar
 
@@ -46,7 +46,7 @@ Si en lugar de eso aparece `ERROR`, **no intentes arreglarlo**: el guion ya guar
 ./fraude abrir
 ```
 
-**Deberías ver:** con `estado`, dos líneas: `api responde en …` y `n8n responde en …`. Con `abrir`, el navegador en `http://localhost:8000`. En esta versión la página aún no existe, así que mostrará un mensaje corto de «no encontrado»; para ver algo, entra en `http://localhost:8000/salud`, que debe mostrar `"estado":"ok"`.
+**Deberías ver:** con `estado`, dos líneas: `api responde en …` y `n8n responde en …`. Con `abrir`, el navegador en `http://localhost:8000`. En esta versión la página aún no existe, así que mostrará un mensaje corto de «no encontrado»; para ver algo, entra en `http://localhost:8000/salud`, que debe mostrar `"estado":"ok"` y, después de entrenar, `"cargado":true` dentro de `"modelo"`.
 
 Si quieres, haz una captura con `Print Screen`. Se guarda sola en `~/Pictures/Screenshots` y el siguiente paso la recoge.
 
