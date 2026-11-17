@@ -15,15 +15,23 @@ solo_root = pytest.mark.skipif(not ES_ROOT, reason="Describe el caso `sudo ./fra
 
 DOCKER_FALSO = r"""#!/bin/bash
 echo "docker[sudo=${FALSO_ES_SUDO:-0}] $*" >> "$FALSO_REGISTRO"
+if [ "$1" = "compose" ]; then
+    echo "perfiles=${COMPOSE_PROFILES:-} archivos=${COMPOSE_FILE:-} llm=${FRAUDE_LLM:-} $*" \
+        >> "$FALSO_REGISTRO.entorno"
+fi
 if [ "$1" = "info" ]; then
     if [ -n "${FALSO_DOCKER_PIDE_SUDO:-}" ] && [ -z "${FALSO_ES_SUDO:-}" ]; then exit 1; fi
+    if [ -n "${FALSO_RUNTIME_NVIDIA:-}" ]; then echo '{"nvidia":{},"runc":{}}'; exit 0; fi
     echo "informacion"; exit 0
 fi
 if [ "$1" = "version" ]; then echo "29.0.0"; exit 0; fi
 if [ "$1" = "compose" ]; then
     case " $* " in
         *" version "*) echo "5.0.0"; exit 0 ;;
-        *" up "*) [ -n "${FALSO_UP_FALLA:-}" ] && exit 1; exit 0 ;;
+        *" up "*)
+            [ -n "${FALSO_UP_FALLA:-}" ] && exit 1
+            [ -n "${FALSO_UP_FALLA_CON_GRAFICA:-}" ] && [ -n "${COMPOSE_FILE:-}" ] && exit 1
+            exit 0 ;;
         *" logs "*) echo "registro de ${!#} TELEGRAM_TOKEN=abc"; exit 0 ;;
         *" tareas todo"*)
             stat -c %u "$FALSO_RAIZ/resultados/en_curso" > "$FALSO_RAIZ/dueno_al_ejecutar.txt"
@@ -56,6 +64,12 @@ echo "sudo $*" >> "$FALSO_REGISTRO"
 FALSO_ES_SUDO=1 exec "$@"
 """
 
+NVIDIA_SMI_FALSO = r"""#!/bin/bash
+[ -z "${FALSO_NVIDIA:-}" ] && exit 9
+if [ "$1" = "-L" ]; then echo "GPU 0: NVIDIA GeForce RTX 5060 Laptop GPU"; exit 0; fi
+echo "NVIDIA GeForce RTX 5060 Laptop GPU, 8151 MiB, 580.95"
+"""
+
 ABRIR_FALSO = r"""#!/bin/bash
 echo "xdg-open $*" >> "$FALSO_REGISTRO"
 """
@@ -76,6 +90,7 @@ class Guion:
             ("xdg-open", ABRIR_FALSO),
             ("ss", SS_FALSO),
             ("omarchy-version", OMARCHY_FALSO),
+            ("nvidia-smi", NVIDIA_SMI_FALSO),
         ):
             (simulados / nombre).write_text(texto)
             (simulados / nombre).chmod(0o755)
@@ -100,6 +115,10 @@ class Guion:
 
     def llamadas(self) -> list[str]:
         return self.registro.read_text().splitlines() if self.registro.exists() else []
+
+    def entorno_compose(self) -> list[str]:
+        ruta = Path(f"{self.registro}.entorno")
+        return ruta.read_text().splitlines() if ruta.exists() else []
 
     def en_curso(self) -> Path:
         return self.proyecto / "resultados" / "en_curso"
@@ -365,3 +384,116 @@ def test_entrenar_y_evaluar_sueltos_con_muestra(guion):
 
 def test_la_ayuda_explica_la_muestra(guion):
     assert "--muestra" in guion.ejecutar("ayuda").stdout
+
+
+# --- LLM local (fase 7, ADR 0016) -----------------------------------------------------------
+
+
+def _linea(lineas: list[str], fragmento: str) -> str:
+    coincidencias = [linea for linea in lineas if fragmento in linea]
+    assert coincidencias, f"Ninguna llamada con «{fragmento}»: {lineas}"
+    return coincidencias[-1]
+
+
+def test_todo_sin_llm_no_activa_el_perfil(guion):
+    resultado = guion.ejecutar("todo")
+
+    assert resultado.returncode == 0, resultado.stderr
+    arranque = _linea(guion.entorno_compose(), " up ")
+    assert "perfiles= " in arranque and "archivos= " in arranque
+    assert "llm=desactivado" in arranque
+    assert "tareas todo --sin-evidencia" in _linea(guion.llamadas(), "tareas todo")
+    assert "--llm" not in _linea(guion.llamadas(), "tareas todo")
+    anfitrion = json.loads((guion.en_curso() / "anfitrion.json").read_text())
+    assert anfitrion["llm"]["solicitado"] is False
+
+
+def test_todo_con_llm_y_grafica_preparada_usa_la_grafica(guion):
+    resultado = guion.ejecutar("todo", "--llm", FALSO_RUNTIME_NVIDIA="1", FALSO_NVIDIA="1")
+
+    assert resultado.returncode == 0, resultado.stderr
+    arranque = _linea(guion.entorno_compose(), " up ")
+    assert "perfiles=llm" in arranque
+    assert "archivos=compose.yaml:compose.gpu.yaml" in arranque
+    assert "llm=activo" in arranque
+    assert "tareas todo --sin-evidencia --llm" in _linea(guion.llamadas(), "tareas todo")
+    assert "grafica" in resultado.stdout and "3,3 GB" in resultado.stdout
+    anfitrion = json.loads((guion.en_curso() / "anfitrion.json").read_text())
+    assert anfitrion["llm"] == {
+        "solicitado": True,
+        "ejecucion": "grafica",
+        "nvidia_smi": True,
+        "runtime_nvidia": True,
+    }
+
+
+def test_todo_con_llm_sin_preparar_la_grafica_usa_el_procesador_y_lo_explica(guion):
+    resultado = guion.ejecutar("todo", "--llm", FALSO_NVIDIA="1")
+
+    assert resultado.returncode == 0, resultado.stderr
+    arranque = _linea(guion.entorno_compose(), " up ")
+    assert "perfiles=llm" in arranque and "archivos= " in arranque
+    assert "procesador" in resultado.stdout
+    assert "EJECUTAR.md" in resultado.stdout
+    assert "nvidia-container-toolkit" in resultado.stdout
+    anfitrion = json.loads((guion.en_curso() / "anfitrion.json").read_text())
+    assert anfitrion["llm"]["ejecucion"] == "procesador"
+    assert anfitrion["llm"]["runtime_nvidia"] is False
+
+
+def test_si_la_grafica_no_arranca_reintenta_con_el_procesador(guion):
+    resultado = guion.ejecutar(
+        "todo", "--llm", FALSO_RUNTIME_NVIDIA="1", FALSO_NVIDIA="1", FALSO_UP_FALLA_CON_GRAFICA="1"
+    )
+
+    assert resultado.returncode == 0, resultado.stderr
+    arranques = [linea for linea in guion.entorno_compose() if " up " in linea]
+    assert len(arranques) == 2
+    assert "compose.gpu.yaml" in arranques[0] and "archivos= " in arranques[1]
+    assert "procesador" in resultado.stderr + resultado.stdout
+    anfitrion = json.loads((guion.en_curso() / "anfitrion.json").read_text())
+    assert anfitrion["llm"]["ejecucion"] == "procesador"
+
+
+def test_los_pasos_sueltos_tras_todo_con_llm_no_lo_apagan(guion):
+    guion.ejecutar("todo", "--llm", FALSO_RUNTIME_NVIDIA="1", FALSO_NVIDIA="1")
+    guion.ejecutar("demostrar")
+
+    # Mismo entorno de Compose: la API no se recrea sin LLM al lanzar un paso suelto.
+    paso = _linea(guion.entorno_compose(), "tareas demostrar")
+    assert "perfiles=llm" in paso and "llm=activo" in paso and "compose.gpu.yaml" in paso
+
+
+def test_todo_sin_llm_tras_uno_con_llm_lo_desactiva(guion):
+    guion.ejecutar("todo", "--llm")
+    guion.ejecutar("todo")
+
+    arranque = _linea(guion.entorno_compose(), " up ")
+    assert "llm=desactivado" in arranque and "perfiles= " in arranque
+
+
+def test_evidencia_guarda_el_registro_del_llm(guion):
+    guion.ejecutar("todo", "--llm")
+
+    assert (guion.en_curso() / "registros" / "llm.log").is_file()
+
+
+def test_apagar_detiene_tambien_el_llm(guion):
+    guion.ejecutar("todo", "--llm")
+    resultado = guion.ejecutar("apagar")
+
+    assert resultado.returncode == 0
+    assert "perfiles=llm" in _linea(guion.entorno_compose(), "compose down")
+
+
+def test_la_ayuda_explica_el_llm(guion):
+    salida = guion.ejecutar("ayuda").stdout
+
+    assert "--llm" in salida and "plantilla" in salida
+
+
+def test_opcion_desconocida_sigue_fallando(guion):
+    resultado = guion.ejecutar("todo", "--gpu")
+
+    assert resultado.returncode == 2
+    assert "No conozco la opcion" in resultado.stderr

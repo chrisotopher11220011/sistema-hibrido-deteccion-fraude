@@ -14,6 +14,9 @@ services:
       FRAUDE_MODELO: "${FRAUDE_MODELO:-auto}"
       # La pagina habla con n8n a traves de la API, por la red interna (ADR 0007 y 0015).
       FRAUDE_URL_N8N: http://n8n:5678
+      # LLM local (ADR 0016): `activo` solo con ./fraude todo --llm. Sin el, POST
+      # /explicacion responde que se use la plantilla y no llama a nadie.
+      FRAUDE_LLM: "${FRAUDE_LLM:-desactivado}"
     ports:
       - "127.0.0.1:${FRAUDE_PUERTO_API:-8000}:8000"
     volumes:
@@ -88,5 +91,28 @@ services:
       n8n:
         condition: service_healthy
 
+  llm:
+    # Servidor de modelos local, opcional (docs/spec.md, seccion 14; ADR 0016). Solo arranca
+    # con el perfil `llm` (./fraude todo --llm). Version exacta verificada el 2026-11-17; no
+    # usar `latest`. Sin puerto publicado: solo la API habla con el, por la red interna. La
+    # grafica se reserva en compose.gpu.yaml, que ./fraude anade si Docker esta preparado.
+    image: ollama/ollama:0.40.16
+    profiles: ["llm"]
+    environment:
+      OLLAMA_HOST: "0.0.0.0:11434"
+      # El modelo queda cargado mientras el servicio este en marcha: la primera explicacion
+      # no paga la carga.
+      OLLAMA_KEEP_ALIVE: "-1"
+    volumes:
+      # Los modelos descargados (unos 3,3 GB) se guardan aqui y sobreviven a ./fraude apagar.
+      - ollama_modelos:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
 volumes:
   n8n_datos:
+  ollama_modelos:

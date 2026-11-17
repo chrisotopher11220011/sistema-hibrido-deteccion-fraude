@@ -85,3 +85,43 @@ def test_configuracion_sin_umbrales_en_el_codigo():
     assert reglas["MONTO_ALTO_UBICACION_INUSUAL"]["alto_riesgo"] is True
     for nombre in ("modelo.yaml", "decision.yaml"):
         assert yaml.safe_load((RAIZ / "config" / nombre).read_text())
+
+
+# --- LLM local (fase 7, ADR 0016) -----------------------------------------------------------
+
+CONFIG_LLM = yaml.safe_load((RAIZ / "config" / "llm.yaml").read_text())
+
+
+def test_llm_solo_con_su_perfil_version_exacta_y_sin_puertos():
+    llm = COMPOSE["services"]["llm"]
+    assert llm["profiles"] == ["llm"]
+    assert re.fullmatch(r"ollama/ollama:\d+\.\d+\.\d+", llm["image"]), llm["image"]
+    assert "ports" not in llm
+    assert "deploy" not in llm  # La grafica solo con compose.gpu.yaml.
+    assert llm["environment"]["OLLAMA_KEEP_ALIVE"] == "-1"
+    assert any(str(v).startswith("ollama_modelos:") for v in llm["volumes"])
+    assert "ollama_modelos" in COMPOSE["volumes"]
+    assert llm["healthcheck"]["test"][:2] == ["CMD", "ollama"]
+
+
+def test_la_api_no_depende_del_llm_y_lo_usa_solo_si_se_activa():
+    api = COMPOSE["services"]["api"]
+    assert "llm" not in (api.get("depends_on") or {})
+    assert api["environment"]["FRAUDE_LLM"] == "${FRAUDE_LLM:-desactivado}"
+    assert "llm" not in (COMPOSE["services"]["tareas"].get("depends_on") or {})
+
+
+def test_la_configuracion_apunta_al_servicio_llm():
+    assert CONFIG_LLM["servidor"]["url"] == "http://llm:11434"
+
+
+def test_la_grafica_se_reserva_en_un_archivo_aparte():
+    gpu = yaml.safe_load((RAIZ / "compose.gpu.yaml").read_text())
+    assert set(gpu["services"]) == {"llm"}
+    dispositivos = gpu["services"]["llm"]["deploy"]["resources"]["reservations"]["devices"]
+    assert dispositivos == [{"driver": "nvidia", "count": "all", "capabilities": ["gpu"]}]
+
+
+def test_omarchy_no_usa_sus_modelos_propios():
+    texto = (RAIZ / "fraude").read_text() + (RAIZ / "compose.yaml").read_text()
+    assert "omarchy agent" not in texto and "11435" not in texto

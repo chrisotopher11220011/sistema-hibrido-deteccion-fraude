@@ -15,6 +15,10 @@ PUERTO_API="${FRAUDE_PUERTO_API:-8000}"
 PUERTO_N8N="${FRAUDE_PUERTO_N8N:-5678}"
 URL_PAGINA="http://localhost:${PUERTO_API}"
 SERVICIOS=(api n8n)
+# Mientras el LLM local este activo (./fraude todo --llm) guarda donde corre: `grafica` o
+# `procesador`. Asi los pasos sueltos usan el mismo Compose y no recrean la API sin LLM.
+ESTADO_LLM="$EN_CURSO/.llm"
+FORZAR_PERFIL_LLM=0
 
 MODO_DOCKER=""   # directo | sudo | root
 UID_USUARIO="$(id -u)"
@@ -42,6 +46,10 @@ Uso: ./fraude <comando>
   todo        Arranca los servicios, ejecuta todos los pasos y reune la evidencia.
               Con --muestra usa datos de prueba generados en lugar del conjunto real
               (sirve para comprobar el sistema; sus cifras no se reportan).
+              Con --llm activa el LLM local, que redacta la explicacion de cada alerta
+              (no decide el nivel). Usa la grafica NVIDIA si Docker esta preparado para
+              ella (EJECUTAR.md) y si no, el procesador. La primera vez descarga unos
+              6,7 GB. Si el LLM falla o tarda, se usa la explicacion por plantilla.
   evidencia   Reune de nuevo la evidencia (registros, capturas y observaciones).
   abrir       Abre la pagina en el navegador (${URL_PAGINA}).
   estado      Dice que servicios estan en marcha y si responden.
@@ -104,8 +112,15 @@ git_() { git -c safe.directory="$RAIZ" "$@" 2>/dev/null; }
 commit_actual() { git_ rev-parse --short HEAD || echo "sin-commit"; }
 etiqueta_actual() { git_ describe --tags --always || echo "sin-etiqueta"; }
 
-# Compose recibe el usuario real para que los contenedores escriban a su nombre.
+llm_ejecucion() { [ -f "$ESTADO_LLM" ] && head -n 1 "$ESTADO_LLM"; }
+
+# Compose recibe el usuario real para que los contenedores escriban a su nombre, y el estado
+# del LLM local: perfil `llm`, `FRAUDE_LLM` para la API y la reserva de la grafica.
 compose() {
+    local ejecucion estado_llm="desactivado" perfiles=""
+    ejecucion="$(llm_ejecucion)"
+    [ -n "$ejecucion" ] && { estado_llm="activo"; perfiles="llm"; }
+    [ "$FORZAR_PERFIL_LLM" = "1" ] && perfiles="llm"
     local entorno=(
         "FRAUDE_UID=$UID_USUARIO"
         "FRAUDE_GID=$GID_USUARIO"
@@ -113,7 +128,10 @@ compose() {
         "FRAUDE_PUERTO_N8N=$PUERTO_N8N"
         "FRAUDE_COMMIT=$(commit_actual)"
         "FRAUDE_ETIQUETA=$(etiqueta_actual)"
+        "FRAUDE_LLM=$estado_llm"
     )
+    [ -n "$perfiles" ] && entorno+=("COMPOSE_PROFILES=$perfiles")
+    [ "$ejecucion" = "grafica" ] && entorno+=("COMPOSE_FILE=compose.yaml:compose.gpu.yaml")
     if [ "$MODO_DOCKER" = "sudo" ]; then
         sudo env "${entorno[@]}" docker compose "$@"
     else
@@ -138,7 +156,8 @@ preparar_carpetas() {
 nueva_sesion() {
     rm -rf "$EN_CURSO/registros" "$EN_CURSO/capturas" "$EN_CURSO/pasos.json" "$EN_CURSO/.puertos_antes" \
         "$EN_CURSO/datos.json" "$EN_CURSO/eda" "$EN_CURSO/modelo.json" "$EN_CURSO/metricas.json" \
-        "$EN_CURSO/comparativa.md" "$EN_CURSO/figuras" "$EN_CURSO/analisis_errores"
+        "$EN_CURSO/comparativa.md" "$EN_CURSO/figuras" "$EN_CURSO/analisis_errores" \
+        "$EN_CURSO/llm.json"
     if [ -f "$EN_CURSO/OBSERVACIONES.md" ]; then
         mkdir -p "$EN_CURSO/anteriores"
         mv "$EN_CURSO/OBSERVACIONES.md" "$EN_CURSO/anteriores/OBSERVACIONES-$(date -u +%Y%m%dT%H%M%SZ).md"
@@ -181,6 +200,7 @@ recoger_anfitrion() {
     local omarchy="" origen_omarchy="no detectado" sistema="" nucleo docker_motor compose_version
     local grafica="" origen_grafica="no detectada" nvidia_en_docker="false" cortafuegos memoria_mb=""
     local procesador="" nucleos="" disco_libre_gb="" uso_sudo="false" puertos="" puertos_antes=""
+    local llm_solicitado="false" llm_ejecucion_json="null" nvidia_smi="false"
 
     if command -v omarchy-version >/dev/null 2>&1; then
         omarchy="$(primera_linea omarchy-version)"; origen_omarchy="omarchy-version"
@@ -227,6 +247,11 @@ recoger_anfitrion() {
     puertos_antes="no registrado (los servicios no se arrancaron con ./fraude todo)"
     [ -f "$EN_CURSO/.puertos_antes" ] && puertos_antes="$(cat "$EN_CURSO/.puertos_antes")"
     [ "$MODO_DOCKER" = "sudo" ] && uso_sudo="true"
+    nvidia_responde && nvidia_smi="true"
+    if [ -n "$(llm_ejecucion)" ]; then
+        llm_solicitado="true"
+        llm_ejecucion_json="$(json_cadena "$(llm_ejecucion)")"
+    fi
 
     cat > "$EN_CURSO/anfitrion.json" <<FIN
 {
@@ -244,15 +269,17 @@ recoger_anfitrion() {
   "nucleos": ${nucleos:-null},
   "memoria_mb": ${memoria_mb:-null},
   "disco_libre_gb": ${disco_libre_gb:-null},
+  "llm": {"solicitado": $llm_solicitado, "ejecucion": $llm_ejecucion_json, "nvidia_smi": $nvidia_smi, "runtime_nvidia": $nvidia_en_docker},
   "puertos": {"api": $PUERTO_API, "n8n": $PUERTO_N8N, "en_escucha_antes_de_arrancar": $(json_cadena "$puertos_antes"), "en_escucha_ahora": $(json_cadena "$puertos")}
 }
 FIN
 }
 
 guardar_registros() {
-    local servicio
+    local servicio servicios=("${SERVICIOS[@]}")
     mkdir -p "$EN_CURSO/registros"
-    for servicio in "${SERVICIOS[@]}"; do
+    [ -n "$(llm_ejecucion)" ] && servicios+=(llm)
+    for servicio in "${servicios[@]}"; do
         compose logs --no-color --tail 400 "$servicio" > "$EN_CURSO/registros/$servicio.log" 2>&1 || true
     done
     compose ps --all > "$EN_CURSO/registros/servicios.txt" 2>&1 || true
@@ -301,11 +328,52 @@ reunir_evidencia() {
     return "$codigo"
 }
 
+# --- LLM local (docs/decisions/0016) ----------------------------------------
+
+nvidia_responde() { command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; }
+
+# La grafica sirve dentro de Docker si el controlador responde y Docker tiene el entorno
+# `nvidia` (lo registra `nvidia-ctk runtime configure --runtime=docker`).
+grafica_para_llm() {
+    nvidia_responde || return 1
+    docker_ info --format '{{json .Runtimes}}' 2>/dev/null | grep -q nvidia
+}
+
+activar_llm() {
+    if grafica_para_llm; then
+        printf 'grafica\n' > "$ESTADO_LLM"
+        decir "LLM local activado: usara la grafica NVIDIA."
+    else
+        printf 'procesador\n' > "$ESTADO_LLM"
+        decir "LLM local activado en el procesador (mas lento): Docker no tiene la grafica preparada."
+        if nvidia_responde; then
+            decir "Para usar la grafica, una sola vez: sudo pacman -S nvidia-container-toolkit,"
+            decir "sudo nvidia-ctk runtime configure --runtime=docker y sudo systemctl restart docker."
+        else
+            decir "No encuentro una grafica NVIDIA que responda (nvidia-smi); sigo con el procesador."
+            decir "Si la hay, revisa su controlador; la preparacion de nvidia-container-toolkit esta en EJECUTAR.md."
+        fi
+        decir "Lo explica EJECUTAR.md, seccion «LLM local». El resultado no cambia: solo el tiempo."
+    fi
+    decir "La primera vez descarga el servidor de modelos (unos 3,4 GB) y el modelo (unos 3,3 GB)."
+}
+
+arrancar_servicios() {
+    compose up -d --build --wait --wait-timeout 420 && return 0
+    if [ "$(llm_ejecucion)" = "grafica" ]; then
+        avisar "La grafica no arranco dentro de Docker; reintento con el LLM en el procesador."
+        avisar "Revisa la preparacion de la grafica en EJECUTAR.md (seccion «LLM local»)."
+        printf 'procesador\n' > "$ESTADO_LLM"
+        compose up -d --build --wait --wait-timeout 420 && return 0
+    fi
+    return 1
+}
+
 cmd_todo() {
-    local codigo=0 argumento opciones_tareas=()
+    local codigo=0 argumento opciones_tareas=() con_llm=0
     for argumento in "$@"; do
         if [ "$argumento" = "--llm" ]; then
-            avisar "La explicacion con LLM local llega en la fase 7; por ahora --llm no cambia nada."
+            con_llm=1
         elif [ "$argumento" = "--muestra" ]; then
             opciones_tareas+=(--muestra)
             decir "Uso la muestra para pruebas, no el conjunto real: sus cifras no se reportan."
@@ -317,6 +385,12 @@ cmd_todo() {
     detectar_docker || return 1
     preparar_carpetas
     nueva_sesion
+    if [ "$con_llm" -eq 1 ]; then
+        activar_llm
+        opciones_tareas+=(--llm)
+    else
+        rm -f "$ESTADO_LLM"
+    fi
     if compose ps -q 2>/dev/null | grep -q .; then
         printf 'no registrado (los servicios del proyecto ya estaban en marcha)' > "$EN_CURSO/.puertos_antes"
     else
@@ -324,9 +398,13 @@ cmd_todo() {
     fi
     recoger_anfitrion
 
-    decir "Paso 1 de 3: construir y arrancar los servicios (api y n8n)."
+    if [ "$con_llm" -eq 1 ]; then
+        decir "Paso 1 de 3: construir y arrancar los servicios (api, n8n y llm)."
+    else
+        decir "Paso 1 de 3: construir y arrancar los servicios (api y n8n)."
+    fi
     decir "La primera vez descarga imagenes y puede tardar varios minutos."
-    if compose up -d --build --wait --wait-timeout 420; then
+    if arrancar_servicios; then
         decir "Servicios en marcha: la API y n8n responden."
         decir "Paso 2 de 3: ejecutar los pasos del proyecto."
         tareas tareas todo --sin-evidencia "${opciones_tareas[@]}" || codigo=$?
@@ -370,6 +448,7 @@ responde() {
 cmd_estado() {
     local nombre url
     detectar_docker || return 1
+    FORZAR_PERFIL_LLM=1
     compose ps --all
     if ! command -v curl >/dev/null 2>&1; then
         decir "No encuentro curl; no puedo comprobar si responden."
@@ -399,14 +478,14 @@ cmd_abrir() {
     else
         decir "Abre esta direccion en el navegador (Super + Shift + Return): $URL_PAGINA"
     fi
-    decir "En esta version la pagina de simulacion aun no existe (llega en la fase 6)."
-    decir "Por ahora puedes ver el estado en $URL_PAGINA/salud"
 }
 
 cmd_apagar() {
     detectar_docker || return 1
     decir "Deteniendo los servicios..."
+    FORZAR_PERFIL_LLM=1
     compose down || return 1
+    rm -f "$ESTADO_LLM"
     decir "Todo detenido. Los resultados siguen en resultados/."
 }
 
