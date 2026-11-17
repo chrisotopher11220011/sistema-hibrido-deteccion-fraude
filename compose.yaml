@@ -6,7 +6,7 @@ name: fraude
 services:
   api:
     build: .
-    image: fraude-local:0.1.0
+    image: fraude-local:0.2.0
     user: "${FRAUDE_UID:-1000}:${FRAUDE_GID:-1000}"
     ports:
       - "127.0.0.1:${FRAUDE_PUERTO_API:-8000}:8000"
@@ -61,7 +61,7 @@ services:
       start_period: 180s
 
   tareas:
-    image: fraude-local:0.1.0
+    image: fraude-local:0.2.0
     pull_policy: never
     profiles: ["tareas"]
     user: "${FRAUDE_UID:-1000}:${FRAUDE_GID:-1000}"

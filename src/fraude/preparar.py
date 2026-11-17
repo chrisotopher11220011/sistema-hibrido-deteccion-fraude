@@ -187,9 +187,7 @@ def _sinteticos(raiz: Path, config: dict, config_reglas: dict) -> dict:
     }
 
 
-def preparar(
-    raiz: Path, muestra: bool = False, abrir: Callable = urllib.request.urlopen
-) -> dict:
+def preparar(raiz: Path, muestra: bool = False, abrir: Callable = urllib.request.urlopen) -> dict:
     """Ejecuta el paso completo. Devuelve el contenido de `datos.json`, que tambien escribe."""
     raiz = Path(raiz)
     en_curso = raiz / "resultados" / "en_curso"

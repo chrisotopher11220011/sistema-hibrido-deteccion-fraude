@@ -153,6 +153,8 @@ def test_version_y_entorno(tmp_path, monkeypatch):
     assert version["etiqueta"] == "v0.1.0"
     assert version["n8n"] == "2.47.7"
     assert "fastapi" in version["dependencias"]
+    for nombre in ("pandas", "numpy", "scikit-learn", "matplotlib"):
+        assert version["dependencias"][nombre] != "no instalada", nombre
     entorno = json.loads((carpeta / "entorno.json").read_text())
     assert entorno["arquitectura"]
     assert entorno["fecha"] == "2026-11-16T20:30:00Z"
@@ -180,3 +182,40 @@ def test_comprobar_servicios_no_acepta_codigos_de_error():
 
     assert [r["ok"] for r in resultado] == [False, False]
     assert "404" in resultado[1]["detalle"]
+
+
+def _dejar_preparar(raiz, fuente="muestra", reportable=False):
+    en_curso = raiz / "resultados" / "en_curso"
+    (en_curso / "eda").mkdir(parents=True)
+    informe = {"estado": "ok", "fuente": fuente, "reportable": reportable, "filas": 10}
+    (en_curso / "datos.json").write_text(json.dumps(informe))
+    (en_curso / "eda" / "resumen.json").write_text("{}")
+    (en_curso / "eda" / "montos_por_clase.png").write_bytes(b"\x89PNG")
+
+
+def test_copia_datos_y_analisis_exploratorio(tmp_path):
+    _dejar_preparar(tmp_path)
+    carpeta = reunir(tmp_path)
+    assert json.loads((carpeta / "datos.json").read_text())["fuente"] == "muestra"
+    assert (carpeta / "eda" / "resumen.json").is_file()
+    assert (carpeta / "eda" / "montos_por_clase.png").read_bytes() == b"\x89PNG"
+    with zipfile.ZipFile(carpeta.with_suffix(".zip")) as z:
+        assert f"{carpeta.name}/eda/resumen.json" in z.namelist()
+
+
+def test_resumen_avisa_cuando_los_datos_son_la_muestra(tmp_path):
+    _dejar_preparar(tmp_path)
+    resumen = (reunir(tmp_path) / "RESUMEN.md").read_text()
+    assert "muestra" in resumen.lower() and "no reportable" in resumen.lower()
+
+
+def test_resumen_con_datos_reales_no_trae_el_aviso_de_muestra(tmp_path):
+    _dejar_preparar(tmp_path, fuente="openml", reportable=True)
+    resumen = (reunir(tmp_path) / "RESUMEN.md").read_text()
+    assert "no reportable" not in resumen.lower()
+    assert "openml" in resumen
+
+
+def test_sin_preparar_lo_anota(tmp_path):
+    resumen = (reunir(tmp_path) / "RESUMEN.md").read_text()
+    assert "datos.json" in resumen

@@ -202,7 +202,8 @@ def test_sinteticos_nunca_se_mezclan_con_los_originales(raiz, conjunto_real_pequ
     sinteticos = leer(raiz / "datos" / "sinteticos" / "ubicacion.json")
     assert {t["origen"] for t in sinteticos} == {"sintetico"}
     assert all("variables" not in t for t in sinteticos)
-    for carpeta in (raiz / "datos" / "crudos", raiz / "datos" / "preparados", raiz / "datos" / "muestra"):
+    for nombre in ("crudos", "preparados", "muestra"):
+        carpeta = raiz / "datos" / nombre
         for archivo in carpeta.rglob("*"):
             if archivo.is_file():
                 assert "s-00001" not in archivo.read_text(errors="replace"), archivo

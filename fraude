@@ -40,12 +40,16 @@ Prototipo academico de deteccion hibrida de fraude.
 Uso: ./fraude <comando>
 
   todo        Arranca los servicios, ejecuta todos los pasos y reune la evidencia.
+              Con --muestra usa datos de prueba generados en lugar del conjunto real
+              (sirve para comprobar el sistema; sus cifras no se reportan).
   evidencia   Reune de nuevo la evidencia (registros, capturas y observaciones).
   abrir       Abre la pagina en el navegador (${URL_PAGINA}).
   estado      Dice que servicios estan en marcha y si responden.
   apagar      Detiene todos los servicios.
 
-  preparar | entrenar | evaluar | demostrar
+  preparar [--muestra]
+              Descarga y verifica los datos, crea la particion y el analisis exploratorio.
+  entrenar | evaluar | demostrar
               Pasos sueltos. Se activan en fases posteriores del proyecto.
 
 Lo habitual: ./fraude todo, usar la pagina, ./fraude evidencia y ./fraude apagar.
@@ -128,7 +132,8 @@ preparar_carpetas() {
 }
 
 nueva_sesion() {
-    rm -rf "$EN_CURSO/registros" "$EN_CURSO/capturas" "$EN_CURSO/pasos.json" "$EN_CURSO/.puertos_antes"
+    rm -rf "$EN_CURSO/registros" "$EN_CURSO/capturas" "$EN_CURSO/pasos.json" "$EN_CURSO/.puertos_antes" \
+        "$EN_CURSO/datos.json" "$EN_CURSO/eda"
     if [ -f "$EN_CURSO/OBSERVACIONES.md" ]; then
         mkdir -p "$EN_CURSO/anteriores"
         mv "$EN_CURSO/OBSERVACIONES.md" "$EN_CURSO/anteriores/OBSERVACIONES-$(date -u +%Y%m%dT%H%M%SZ).md"
@@ -292,10 +297,13 @@ reunir_evidencia() {
 }
 
 cmd_todo() {
-    local codigo=0 argumento
+    local codigo=0 argumento opciones_tareas=()
     for argumento in "$@"; do
         if [ "$argumento" = "--llm" ]; then
             avisar "La explicacion con LLM local llega en la fase 7; por ahora --llm no cambia nada."
+        elif [ "$argumento" = "--muestra" ]; then
+            opciones_tareas+=(--muestra)
+            decir "Uso la muestra para pruebas, no el conjunto real: sus cifras no se reportan."
         else
             fallar "No conozco la opcion: $argumento"
             return 2
@@ -316,7 +324,7 @@ cmd_todo() {
     if compose up -d --build --wait --wait-timeout 420; then
         decir "Servicios en marcha: la API y n8n responden."
         decir "Paso 2 de 3: ejecutar los pasos del proyecto."
-        tareas tareas todo --sin-evidencia || codigo=$?
+        tareas tareas todo --sin-evidencia "${opciones_tareas[@]}" || codigo=$?
     else
         codigo=1
         fallar "Los servicios no arrancaron bien. Guardo los registros para diagnosticarlo."

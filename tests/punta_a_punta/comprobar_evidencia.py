@@ -9,7 +9,9 @@ import sys
 import zipfile
 from pathlib import Path
 
-RESULTADOS = Path(__file__).resolve().parents[2] / "resultados"
+RAIZ = Path(__file__).resolve().parents[2]
+RESULTADOS = RAIZ / "resultados"
+DATOS = RAIZ / "datos"
 ARCHIVOS = (
     "RESUMEN.md",
     "anfitrion.json",
@@ -17,6 +19,8 @@ ARCHIVOS = (
     "version.json",
     "errores.json",
     "OBSERVACIONES.md",
+    "datos.json",
+    "eda/resumen.json",
 )
 
 
@@ -47,6 +51,18 @@ def main() -> int:
         version = json.loads((carpeta / "version.json").read_text())
         if version["commit"] in ("", "sin-commit"):
             fallos.append("version.json no trae el commit")
+        datos = json.loads((carpeta / "datos.json").read_text())
+        if datos.get("estado") != "ok":
+            fallos.append(f"preparar no termino bien: {datos.get('error')}")
+        elif datos.get("fuente") != "muestra" or datos.get("reportable") is not False:
+            fallos.append("en la CI los datos deben ser la muestra, marcada no reportable")
+        if not list((carpeta / "eda").glob("*.png")):
+            fallos.append("eda/ no trae figuras")
+        sinteticos = DATOS / "sinteticos" / "ubicacion.json"
+        if not sinteticos.is_file():
+            fallos.append("falta datos/sinteticos/ubicacion.json")
+        elif {t["origen"] for t in json.loads(sinteticos.read_text())} != {"sintetico"}:
+            fallos.append("los datos sinteticos traen transacciones que no son sinteticas")
         if con_anfitrion:
             anfitrion = json.loads((carpeta / "anfitrion.json").read_text())
             if "uso_sudo" not in anfitrion:
@@ -55,13 +71,14 @@ def main() -> int:
                 if not (carpeta / "registros" / registro).is_file():
                     fallos.append(f"falta registros/{registro}")
 
-    # Supuesto S7: nada queda a nombre de root.
-    for ruta in [RESULTADOS, *RESULTADOS.rglob("*")]:
-        if ruta.name == ".gitkeep":
-            continue
-        if ruta.stat().st_uid != os.getuid():
-            fallos.append(f"{ruta} pertenece al uid {ruta.stat().st_uid}, no al usuario")
-            break
+    # Supuesto S7: nada de resultados/ ni de datos/ queda a nombre de root.
+    for base in (RESULTADOS, DATOS):
+        for ruta in [base, *base.rglob("*")]:
+            if ruta.name == ".gitkeep":
+                continue
+            if ruta.stat().st_uid != os.getuid():
+                fallos.append(f"{ruta} pertenece al uid {ruta.stat().st_uid}, no al usuario")
+                break
 
     for fallo in fallos:
         print(f"FALLO: {fallo}")
