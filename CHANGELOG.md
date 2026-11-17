@@ -6,6 +6,27 @@ Cada entrada indica su nivel de verificación: N1 (entorno de desarrollo), N2 (G
 
 ## [Sin publicar]
 
+## [0.5.0] - 2026-11-17
+
+Fase 5, flujos de n8n. Lo comprobado en la CI usa la muestra para pruebas: confirma que los flujos funcionan y que n8n y Python clasifican igual, no mide la detección de fraude.
+
+### Añadido
+
+- Flujo `evaluacion.json` (`POST /webhook/transaccion`): validar entrada, consultar `/evaluar` con tiempo límite de 10 s y 3 intentos ante errores de red, clasificar nivel con la tabla 8.4 en el Switch «Clasificar nivel», razones y explicación por plantilla, notificación simulada, registrar el caso y responder con él. Una entrada inválida o una evaluación fallida terminan en `error_evaluacion`, pendientes de revisión (N1 con simulador; N2 con n8n 2.47.7).
+- Flujo `revision.json` (`POST /webhook/revision`): guarda la decisión con `POST /casos/{id}/revision` y devuelve la respuesta de la API; 422 sin llamarla si `id_caso` no tiene la forma esperada (N1; N2).
+- Si la API no guarda el caso, el webhook responde 502 con el caso calculado (`docs/contratos/error_flujo.schema.json`) (N1; N2 con la API detenida).
+- Simulador de flujos para N1 (`tests/n8n/simulador.mjs`) con la semántica de n8n 2.47.7 comprobada en su código, y prueba de paridad exhaustiva con `decision.clasificar` (N1; N2 en el trabajo de pruebas).
+- Lote de demostración con semilla (`datos/[muestra/]demostracion/lote.json`): fraudes y no fraudes de la parte de prueba, sintéticas de ubicación y entradas inválidas fijas; la etiqueta real va aparte de la transacción (N1).
+- Paso `demostrar`: lote por n8n y por Python, paridad exigida, coherencia nivel-estado, ninguna transacción válida en `error_evaluacion` (si no, la paridad no probaría la tabla), latencia mediana y percentil 95 de las transacciones válidas, todo en `flujo.json`; `todo` lo incluye y la evidencia lo copia (N1; N2: paridad 124/124 con la muestra, [ejecución](https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/actions/runs/44131224953)).
+- CI: flujos reales sin modelo (503 → `error_evaluacion`), entrada inválida, revisión (200, 409, 404, 422) y API detenida (502); `flujo.json` con paridad total.
+- ADR 0014: flujos sin nodos Code, simulador en N1 y respuestas de los webhooks. Un cuerpo que no es JSON válido lo rechaza n8n (422) antes del flujo y no deja caso: documentado y comprobado en la CI.
+- Revisión de código con subagente: tres hallazgos corregidos con prueba (paridad trivial si todo falla, latencia contando entradas que no llaman a la API, JSON mal formado sin documentar).
+
+### Cambiado
+
+- `todo` ejecuta `demostrar` en lugar de anunciarlo. Sin n8n, `demostrar` falla, lo dice en `flujo.json` y los demás pasos siguen.
+- `config/modelo.yaml` añade la sección `demostracion`.
+
 ## [0.4.0] - 2026-11-17
 
 Fase 4, API y casos. Lo comprobado en la CI usa la muestra para pruebas: confirma que la API funciona y cumple los contratos, no mide la detección de fraude.
@@ -90,6 +111,7 @@ Fase 1, cimientos. Sin datos, reglas, modelo ni página todavía: esta versión 
 
 [Sin publicar]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/compare/main...HEAD
 [0.4.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/pull/7
+[0.5.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/pull/8
 [0.3.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/pull/5
 [0.2.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/pull/3
 [0.1.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/pull/1

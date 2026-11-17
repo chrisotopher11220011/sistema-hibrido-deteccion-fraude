@@ -1,0 +1,1134 @@
+{
+  "id": "FraudeEvalTx0001",
+  "name": "Evaluación de transacción",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "transaccion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a8aa2861-0534-588a-9a32-d711acfb1d53",
+      "name": "Webhook transacción",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "85c75e19-21e6-5f92-a10e-5fbaab817bf8"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "415f6490-6a0b-5fbf-861d-3b2c1a0f7dbb",
+              "name": "motivo_entrada",
+              "type": "string",
+              "value": "={{ ($json.body === null || typeof $json.body !== 'object' || Array.isArray($json.body)) ? 'el cuerpo no es un objeto JSON' : (typeof $json.body.id_transaccion !== 'string' || [...$json.body.id_transaccion].length < 1 || [...$json.body.id_transaccion].length > 100) ? 'id_transaccion debe ser un texto de 1 a 100 caracteres' : !['original', 'sintetico'].includes($json.body.origen) ? 'origen debe ser original o sintetico' : (typeof $json.body.monto !== 'number' || !Number.isFinite($json.body.monto) || $json.body.monto < 0) ? 'monto debe ser un número finito mayor o igual que 0' : ('Class' in $json.body) ? 'la transacción no puede traer la etiqueta real (Class)' : '' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c5a0f3e9-62ae-5efb-8602-6b48a9708cf1",
+      "name": "Validar entrada",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8e443be4-075a-56c5-8ade-5ed7677c6550",
+              "leftValue": "={{ $json.motivo_entrada === '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2b638eb8-1883-5f26-bc87-c7d32195d0a6",
+      "name": "¿Entrada válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/evaluar",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Webhook transacción').first().json.body }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "c98220f6-7c31-53e2-a25b-35c2cb4d8f32",
+      "name": "Consultar evaluación",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7529a836-1cd0-5154-8dfc-aea944a8e492",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body !== null && typeof $json.body === 'object' && Array.isArray($json.body.reglas) && $json.body.modelo !== null && typeof $json.body.modelo === 'object' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "26f68ef9-06cb-5055-ac83-10a2b422823c",
+      "name": "¿Evaluación correcta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ebded127-cda1-596b-987e-c5f35f4b036c",
+              "name": "fallo",
+              "type": "boolean",
+              "value": "={{ false }}"
+            },
+            {
+              "id": "436a5b02-e020-54d7-b142-da2e3784296f",
+              "name": "motivo_fallo",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "b10242c4-f8db-5075-8bbb-8803f428a685",
+              "name": "senales",
+              "type": "object",
+              "value": "={{ $json.body }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8d6263ff-d899-54a2-8128-3435e91f033b",
+      "name": "Señales recibidas",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ebded127-cda1-596b-987e-c5f35f4b036c",
+              "name": "fallo",
+              "type": "boolean",
+              "value": "={{ true }}"
+            },
+            {
+              "id": "436a5b02-e020-54d7-b142-da2e3784296f",
+              "name": "motivo_fallo",
+              "type": "string",
+              "value": "={{ '/evaluar respondió ' + $json.statusCode + ((($json.body || {}).error || {}).tipo ? ' ' + $json.body.error.tipo + ': ' + $json.body.error.mensaje : ' sin el formato del contrato 8.3') }}"
+            },
+            {
+              "id": "b10242c4-f8db-5075-8bbb-8803f428a685",
+              "name": "senales",
+              "type": "object",
+              "value": "={{ null }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "20c9657d-8127-5ca8-ae99-66eeea3a0b30",
+      "name": "Evaluación rechazada",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ebded127-cda1-596b-987e-c5f35f4b036c",
+              "name": "fallo",
+              "type": "boolean",
+              "value": "={{ true }}"
+            },
+            {
+              "id": "436a5b02-e020-54d7-b142-da2e3784296f",
+              "name": "motivo_fallo",
+              "type": "string",
+              "value": "={{ 'Sin respuesta de /evaluar tras los reintentos: ' + (typeof $json.error === 'string' ? $json.error : (($json.error || {}).message || 'sin detalle')) }}"
+            },
+            {
+              "id": "b10242c4-f8db-5075-8bbb-8803f428a685",
+              "name": "senales",
+              "type": "object",
+              "value": "={{ null }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b58db99e-352d-5532-9a59-cf0628a65d36",
+      "name": "Evaluación sin respuesta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ebded127-cda1-596b-987e-c5f35f4b036c",
+              "name": "fallo",
+              "type": "boolean",
+              "value": "={{ true }}"
+            },
+            {
+              "id": "436a5b02-e020-54d7-b142-da2e3784296f",
+              "name": "motivo_fallo",
+              "type": "string",
+              "value": "={{ 'Entrada inválida: ' + $json.motivo_entrada }}"
+            },
+            {
+              "id": "b10242c4-f8db-5075-8bbb-8803f428a685",
+              "name": "senales",
+              "type": "object",
+              "value": "={{ null }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "290ad726-b777-58c0-bb94-9e78861715c0",
+      "name": "Entrada inválida",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a8669faf-1efc-5525-9fcc-585c400d18cc",
+              "name": "R_alto",
+              "type": "boolean",
+              "value": "={{ !$json.fallo && $json.senales.reglas.some(r => !!(r.evaluable && r.activada && r.alto_riesgo)) }}"
+            },
+            {
+              "id": "bf8cae52-415d-5a5a-ba94-02b6fd3fb090",
+              "name": "R",
+              "type": "boolean",
+              "value": "={{ !$json.fallo && $json.senales.reglas.some(r => !!(r.evaluable && r.activada)) }}"
+            },
+            {
+              "id": "2db8c7e6-d4ec-5aca-8c44-e374f4c44192",
+              "name": "A",
+              "type": "boolean",
+              "value": "={{ !$json.fallo && (!!$json.senales.modelo.evaluable && !!$json.senales.modelo.anomalia) }}"
+            },
+            {
+              "id": "3faf106f-7b59-59a0-b4e2-1fe02a84fe6d",
+              "name": "A_alta",
+              "type": "boolean",
+              "value": "={{ !$json.fallo && (!!$json.senales.modelo.evaluable && !!$json.senales.modelo.anomalia_alta) }}"
+            },
+            {
+              "id": "a53f82fd-ca04-5853-8f3a-fc976976902a",
+              "name": "R_y_A",
+              "type": "boolean",
+              "value": "={{ !$json.fallo && $json.senales.reglas.some(r => !!(r.evaluable && r.activada)) && (!!$json.senales.modelo.evaluable && !!$json.senales.modelo.anomalia) }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "8d5d5ca6-d1a5-5214-8d18-b9931c9d76a2",
+      "name": "Señales para la tabla",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "483a64f1-0f4a-537c-972a-3529fcc38aa2",
+                    "leftValue": "={{ $json.fallo }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "error_evaluacion"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "00a16801-40a2-556f-9c05-889d26821cb9",
+                    "leftValue": "={{ $json.R_alto }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  },
+                  {
+                    "id": "d19ed3f7-eb0f-5d44-93bf-fa62411f1a79",
+                    "leftValue": "={{ $json.R_y_A }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  },
+                  {
+                    "id": "2cd5b1c1-6c0b-5e41-a11f-886f790a1ac1",
+                    "leftValue": "={{ $json.A_alta }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "alerta_prioritaria"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "83bc6162-0ca1-5b09-9c7e-08c04ba8116f",
+                    "leftValue": "={{ $json.R }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  },
+                  {
+                    "id": "20efb9f6-f2a2-567b-a1b2-2ace9085f417",
+                    "leftValue": "={{ $json.A }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "revision_recomendada"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "sin_alerta"
+        }
+      },
+      "id": "ecfbf9d1-ba81-566c-b757-2f07fa4c48ff",
+      "name": "Clasificar nivel",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "71c3e9c7-4048-5aa0-ae07-560485bd5a61",
+              "name": "nivel",
+              "type": "string",
+              "value": "error_evaluacion"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "c20895ba-18c5-5b2e-a494-04c01006b91c",
+      "name": "Nivel: error de evaluación",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "71c3e9c7-4048-5aa0-ae07-560485bd5a61",
+              "name": "nivel",
+              "type": "string",
+              "value": "alerta_prioritaria"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "2dd02346-6686-5ca5-b0d2-a0884242b8ba",
+      "name": "Nivel: alerta prioritaria",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1760,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "71c3e9c7-4048-5aa0-ae07-560485bd5a61",
+              "name": "nivel",
+              "type": "string",
+              "value": "revision_recomendada"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a88fe769-b52c-5d15-9868-ecc34ac514b8",
+      "name": "Nivel: revisión recomendada",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1760,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "71c3e9c7-4048-5aa0-ae07-560485bd5a61",
+              "name": "nivel",
+              "type": "string",
+              "value": "sin_alerta"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "0ba3713e-9993-56c3-8066-301bc057ad9e",
+      "name": "Nivel: sin alerta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1760,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "58af50d6-a650-538f-98a5-84a4c5027700",
+              "name": "motivos",
+              "type": "array",
+              "value": "={{ $json.fallo ? [] : $json.senales.reglas.filter(r => r.evaluable && r.activada).map(r => r.id + ': ' + r.razon).concat(($json.senales.modelo.evaluable && $json.senales.modelo.anomalia_alta) ? ['Modelo: puntuación ' + (typeof $json.senales.modelo.puntuacion === 'number' ? $json.senales.modelo.puntuacion.toFixed(3) : String($json.senales.modelo.puntuacion)) + ' ≥ umbral prioritario ' + (typeof $json.senales.modelo.umbral_prioritaria === 'number' ? $json.senales.modelo.umbral_prioritaria.toFixed(3) : String($json.senales.modelo.umbral_prioritaria))] : ($json.senales.modelo.evaluable && $json.senales.modelo.anomalia) ? ['Modelo: puntuación ' + (typeof $json.senales.modelo.puntuacion === 'number' ? $json.senales.modelo.puntuacion.toFixed(3) : String($json.senales.modelo.puntuacion)) + ' ≥ umbral de revisión ' + (typeof $json.senales.modelo.umbral_revision === 'number' ? $json.senales.modelo.umbral_revision.toFixed(3) : String($json.senales.modelo.umbral_revision))] : []) }}"
+            },
+            {
+              "id": "9e82c1e1-a1b3-52bf-b2ac-d344acafca84",
+              "name": "anotaciones",
+              "type": "array",
+              "value": "={{ $json.fallo ? [] : $json.senales.reglas.filter(r => !r.evaluable).map(r => r.id + ': ' + r.razon).concat($json.senales.modelo.evaluable ? [] : ['Modelo: no evaluable (la transacción no trae variables)']) }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "d1084c8f-074b-5e84-9ad7-bfa479d5ff3a",
+      "name": "Preparar razones",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "da506fc0-51a5-5ca7-90d5-7690d0984d9e",
+              "name": "razones",
+              "type": "array",
+              "value": "={{ $json.fallo ? [$json.motivo_fallo] : $json.motivos.concat($json.anotaciones) }}"
+            },
+            {
+              "id": "8055f2ad-ae74-58b3-b484-b298b011faa7",
+              "name": "explicacion",
+              "type": "object",
+              "value": "={{ { texto: $json.nivel === 'error_evaluacion' ? 'No se pudo evaluar la transacción: ' + $json.motivo_fallo + '. El caso queda pendiente de revisión: una evaluación fallida nunca se da por buena.' : $json.nivel === 'alerta_prioritaria' ? 'El sistema señala esta transacción para revisión prioritaria. Motivos: ' + $json.motivos.join('; ') + '. Es una señal para que una persona la revise, no una decisión.' : $json.nivel === 'revision_recomendada' ? 'El sistema señala esta transacción para revisión. Motivos: ' + $json.motivos.join('; ') + '. Es una señal para que una persona la revise, no una decisión.' : 'Ninguna señal superó su umbral: no se genera alerta y el caso se cierra.', origen: 'plantilla', modelo: null, duracion_ms: null } }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "c8052039-d9c4-5f43-ad38-238a88ccb79d",
+      "name": "Preparar explicación",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c94e4787-bcc7-5b50-b99a-759b137cebfc",
+              "leftValue": "={{ $json.nivel !== 'sin_alerta' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e6cf9f47-32a4-5d17-9289-818e350548b4",
+      "name": "¿Hay alerta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f74a0b10-611a-5068-9c15-64f92ee95160",
+              "name": "notificacion",
+              "type": "object",
+              "value": "={{ { canal: 'simulada', estado: 'simulada_enviada', detalle: 'Notificación de prueba: queda escrita en el caso y no sale a ningún canal externo.' } }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "e0595950-ef76-5923-b074-b0db34efd3b6",
+      "name": "Notificación de prueba",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2640,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f74a0b10-611a-5068-9c15-64f92ee95160",
+              "name": "notificacion",
+              "type": "object",
+              "value": "={{ { canal: 'simulada', estado: 'no_aplica', detalle: null } }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "5ae883f0-0f0a-5c4a-bc28-9fd709a5a556",
+      "name": "Sin notificación",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2640,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3dd81ceb-d5cf-5f85-9913-984a6dc9ca30",
+              "name": "caso",
+              "type": "object",
+              "value": "={{ ((b) => ({ id_transaccion: (b !== null && typeof b === 'object' && typeof b.id_transaccion === 'string' && [...b.id_transaccion].length >= 1 && [...b.id_transaccion].length <= 100) ? b.id_transaccion : null, origen: (b !== null && typeof b === 'object' && ['original', 'sintetico'].includes(b.origen)) ? b.origen : null, monto: (b !== null && typeof b === 'object' && typeof b.monto === 'number' && Number.isFinite(b.monto)) ? b.monto : null, senales: $json.senales, puntuacion: ($json.senales && typeof $json.senales.modelo.puntuacion === 'number') ? $json.senales.modelo.puntuacion : null, nivel: $json.nivel, razones: $json.razones, explicacion: $json.explicacion, notificacion: $json.notificacion, versiones: { reglas: $json.senales ? ($json.senales.versiones || {}).reglas || null : null, modelo: $json.senales ? ($json.senales.versiones || {}).modelo || null : null, flujo: 'transaccion-0.5.0' } }))($('Webhook transacción').first().json.body) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d13065bb-8487-5a88-8cc1-61c26ace89f0",
+      "name": "Preparar caso",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/casos",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.caso }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "ed6251ad-b063-5da3-941c-462bbd460349",
+      "name": "Registrar caso",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3080,
+        300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5194ad19-824c-5378-80fc-7871a80da8f5",
+              "leftValue": "={{ $json.statusCode === 201 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bdc19210-b9fd-5744-ba51-4c216bdfd62d",
+      "name": "¿Caso registrado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3300,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "cbabcb52-8a7e-5b98-9871-5471fadb442b",
+      "name": "Responder con el caso",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3520,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: { tipo: 'caso_no_registrado', mensaje: (typeof $json.statusCode === 'number' ? 'POST /casos respondió ' + $json.statusCode + ': ' + JSON.stringify($json.body) : 'POST /casos no respondió: ' + (typeof $json.error === 'string' ? $json.error : (($json.error || {}).message || 'sin detalle'))), detalles: [] }, caso: $('Preparar caso').first().json.caso } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "id": "5052e1e1-c337-53b1-8d1c-e4f015ee5b17",
+      "name": "Responder: caso sin registrar",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3520,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook transacción": {
+      "main": [
+        [
+          {
+            "node": "Validar entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar entrada": {
+      "main": [
+        [
+          {
+            "node": "¿Entrada válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Entrada válida?": {
+      "main": [
+        [
+          {
+            "node": "Consultar evaluación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Entrada inválida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar evaluación": {
+      "main": [
+        [
+          {
+            "node": "¿Evaluación correcta?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Evaluación sin respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Evaluación correcta?": {
+      "main": [
+        [
+          {
+            "node": "Señales recibidas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Evaluación rechazada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Señales recibidas": {
+      "main": [
+        [
+          {
+            "node": "Señales para la tabla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluación rechazada": {
+      "main": [
+        [
+          {
+            "node": "Señales para la tabla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluación sin respuesta": {
+      "main": [
+        [
+          {
+            "node": "Señales para la tabla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada inválida": {
+      "main": [
+        [
+          {
+            "node": "Señales para la tabla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Señales para la tabla": {
+      "main": [
+        [
+          {
+            "node": "Clasificar nivel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar nivel": {
+      "main": [
+        [
+          {
+            "node": "Nivel: error de evaluación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nivel: alerta prioritaria",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nivel: revisión recomendada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nivel: sin alerta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nivel: error de evaluación": {
+      "main": [
+        [
+          {
+            "node": "Preparar razones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nivel: alerta prioritaria": {
+      "main": [
+        [
+          {
+            "node": "Preparar razones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nivel: revisión recomendada": {
+      "main": [
+        [
+          {
+            "node": "Preparar razones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nivel: sin alerta": {
+      "main": [
+        [
+          {
+            "node": "Preparar razones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar razones": {
+      "main": [
+        [
+          {
+            "node": "Preparar explicación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar explicación": {
+      "main": [
+        [
+          {
+            "node": "¿Hay alerta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay alerta?": {
+      "main": [
+        [
+          {
+            "node": "Notificación de prueba",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sin notificación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notificación de prueba": {
+      "main": [
+        [
+          {
+            "node": "Preparar caso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sin notificación": {
+      "main": [
+        [
+          {
+            "node": "Preparar caso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar caso": {
+      "main": [
+        [
+          {
+            "node": "Registrar caso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar caso": {
+      "main": [
+        [
+          {
+            "node": "¿Caso registrado?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: caso sin registrar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Caso registrado?": {
+      "main": [
+        [
+          {
+            "node": "Responder con el caso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: caso sin registrar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

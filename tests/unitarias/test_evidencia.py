@@ -344,3 +344,37 @@ def test_sin_base_de_casos_lo_anota_y_no_la_crea(tmp_path):
     assert (carpeta / "revisiones.csv").read_text().startswith("id_caso,")
     assert not (tmp_path / "datos" / "casos" / "casos.sqlite").exists()
     assert "Sin casos registrados" in (carpeta / "RESUMEN.md").read_text()
+
+
+def _dejar_flujo(raiz, estado="ok", coinciden=12):
+    en_curso = raiz / "resultados" / "en_curso"
+    en_curso.mkdir(parents=True, exist_ok=True)
+    flujo = {
+        "estado": estado,
+        "reportable": False,
+        "lote": {"total": 12},
+        "paridad": {"total": 12, "coinciden": coinciden, "completa": coinciden == 12},
+        "latencia_ms": {"n": 12, "mediana": 41.0, "p95": 88.5},
+    }
+    if estado != "ok":
+        flujo["error"] = "paridad incompleta"
+    (en_curso / "flujo.json").write_text(json.dumps(flujo))
+
+
+def test_copia_flujo_json_y_resume_paridad_y_latencia(tmp_path):
+    _dejar_flujo(tmp_path)
+    carpeta = reunir(tmp_path)
+    assert json.loads((carpeta / "flujo.json").read_text())["paridad"]["coinciden"] == 12
+    resumen = (carpeta / "RESUMEN.md").read_text()
+    assert "paridad 12/12" in resumen and "mediana 41.0 ms" in resumen
+
+
+def test_flujo_con_fallo_queda_en_el_resumen(tmp_path):
+    _dejar_flujo(tmp_path, estado="fallo", coinciden=11)
+    resumen = (reunir(tmp_path) / "RESUMEN.md").read_text()
+    assert "demostrar no termino bien" in resumen and "paridad incompleta" in resumen
+
+
+def test_sin_demostrar_lo_anota(tmp_path):
+    resumen = (reunir(tmp_path) / "RESUMEN.md").read_text()
+    assert "Sin flujo.json" in resumen

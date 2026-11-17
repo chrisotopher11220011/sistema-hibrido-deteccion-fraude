@@ -50,6 +50,16 @@ def evaluar_falso(error=None):
     return PasoFalso({"duracion_s": 1.0, "reportable": False}, error)
 
 
+def demostrar_falso(error=None):
+    respuesta = {
+        "reportable": False,
+        "lote": {"total": 12},
+        "paridad": {"total": 12, "coinciden": 12, "completa": True},
+        "latencia_ms": {"mediana": 40.0, "p95": 90.0},
+    }
+    return PasoFalso(respuesta, error)
+
+
 @pytest.fixture
 def raiz(tmp_path, monkeypatch):
     monkeypatch.setenv("FRAUDE_RAIZ", str(tmp_path))
@@ -57,6 +67,7 @@ def raiz(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "preparar", PrepararFalso())
     monkeypatch.setattr(cli, "entrenar", entrenar_falso())
     monkeypatch.setattr(cli, "evaluar", evaluar_falso())
+    monkeypatch.setattr(cli, "demostrar", demostrar_falso())
     return tmp_path
 
 
@@ -97,7 +108,7 @@ def test_todo_sin_evidencia_solo_deja_pasos(raiz, monkeypatch):
     assert cli.main(["todo", "--sin-evidencia"]) == 0
     pasos = json.loads((raiz / "resultados" / "en_curso" / "pasos.json").read_text())
     assert [p["paso"] for p in pasos] == ["preparar", "entrenar", "evaluar", "demostrar"]
-    assert [p["estado"] for p in pasos] == ["ok", "ok", "ok", "no_disponible"]
+    assert [p["estado"] for p in pasos] == ["ok", "ok", "ok", "ok"]
     assert carpetas(raiz) == []
 
 
@@ -107,16 +118,27 @@ def test_evidencia_lee_los_pasos_guardados(raiz, monkeypatch):
 
     assert cli.main(["evidencia"]) == 0
     resumen = (carpetas(raiz)[0] / "RESUMEN.md").read_text()
-    assert "entrenar" in resumen and "fase 5" in resumen
+    assert "entrenar" in resumen and "paridad 12/12" in resumen
 
 
-@pytest.mark.parametrize(
-    ("comando", "fase"),
-    [("demostrar", "fase 5")],
-)
-def test_comando_suelto_que_aun_no_existe_devuelve_dos(raiz, capsys, comando, fase):
-    assert cli.main([comando]) == 2
-    assert fase in capsys.readouterr().out
+def test_demostrar_suelto_informa_paridad_y_latencia(raiz, capsys):
+    assert cli.main(["demostrar", "--muestra"]) == 0
+    assert cli.demostrar.llamadas == [{"raiz": raiz, "muestra": True}]
+    salida = capsys.readouterr().out
+    assert "paridad 12/12" in salida and "mediana 40.0 ms" in salida and "p95 90.0 ms" in salida
+
+
+def test_demostrar_que_falla_devuelve_uno(raiz, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "demostrar", demostrar_falso(RuntimeError("paridad incompleta")))
+    assert cli.main(["demostrar"]) == 1
+    assert "paridad incompleta" in capsys.readouterr().out
+
+
+def test_todo_sigue_y_reune_evidencia_aunque_demostrar_falle(raiz, monkeypatch):
+    monkeypatch.setattr(cli, "comprobar_servicios", servicios())
+    monkeypatch.setattr(cli, "demostrar", demostrar_falso(RuntimeError("n8n no responde")))
+    assert cli.main(["todo"]) == 1
+    assert len(carpetas(raiz)) == 1
 
 
 def test_sin_comando_muestra_ayuda_y_devuelve_dos(raiz, capsys):
@@ -189,13 +211,23 @@ def test_preparar_de_verdad_con_la_muestra(tmp_path, monkeypatch):
 
 
 def test_preparar_entrenar_y_evaluar_de_verdad_con_la_muestra(tmp_path, monkeypatch):
-    """Sin simular nada: el camino de la CI (N2) con `tareas todo --muestra`, sin servicios."""
+    """Sin simular nada: el camino de la CI (N2) con `tareas todo --muestra`, sin servicios.
+
+    Sin n8n ni API, `demostrar` falla (y lo dice en flujo.json) pero los demas pasos terminan.
+    """
     monkeypatch.setenv("FRAUDE_RAIZ", str(tmp_path))
+    monkeypatch.setenv("FRAUDE_URL_N8N", "http://127.0.0.1:9")
+    monkeypatch.setenv("FRAUDE_URL_API", "http://127.0.0.1:9")
     shutil.copytree(RAIZ_REPO / "config", tmp_path / "config")
     ruta = tmp_path / "config" / "modelo.yaml"
     ruta.write_text(ruta.read_text().replace("remuestreos: 1000", "remuestreos: 50"))
-    assert cli.main(["todo", "--muestra", "--sin-evidencia"]) == 0
+    assert cli.main(["todo", "--muestra", "--sin-evidencia"]) == 1
     en_curso = tmp_path / "resultados" / "en_curso"
+    pasos = json.loads((en_curso / "pasos.json").read_text())
+    assert [p["estado"] for p in pasos] == ["ok", "ok", "ok", "fallo"]
+    flujo = json.loads((en_curso / "flujo.json").read_text())
+    assert flujo["estado"] == "fallo" and "n8n" in flujo["error"]
+    assert flujo["lote"]["total"] > 0
     for nombre in ("modelo.json", "metricas.json", "comparativa.md"):
         assert (en_curso / nombre).is_file()
     assert json.loads((en_curso / "metricas.json").read_text())["reportable"] is False

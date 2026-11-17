@@ -237,6 +237,24 @@ def _leer(ruta: Path) -> dict | None:
         return None
 
 
+def _copiar_flujo(en_curso: Path, carpeta: Path) -> list[str]:
+    """Copia `flujo.json` (paso demostrar) y resume paridad y latencia (seccion 16)."""
+    flujo = _leer(en_curso / "flujo.json")
+    if flujo is None:
+        return ["Sin flujo.json: el paso demostrar no se ejecuto en esta sesion."]
+    shutil.copyfile(en_curso / "flujo.json", carpeta / "flujo.json")
+    if flujo.get("estado") != "ok":
+        return [f"Flujo: demostrar no termino bien ({flujo.get('error', 'sin detalle')})."]
+    paridad, latencia = flujo["paridad"], flujo["latencia_ms"]
+    nota = (
+        f"Flujo de n8n: paridad {paridad['coinciden']}/{paridad['total']}, latencia "
+        f"mediana {latencia['mediana']} ms y p95 {latencia['p95']} ms (flujo.json)."
+    )
+    if not flujo.get("reportable", False):
+        nota += " Lote de la muestra para pruebas: no reportable."
+    return [nota]
+
+
 def _copiar_modelo_y_evaluacion(en_curso: Path, carpeta: Path) -> list[str]:
     """Copia lo que dejan `entrenar` y `evaluar` y resume su estado."""
     notas = []
@@ -419,10 +437,11 @@ def _resumen(
         "",
         "Esta version prepara los datos, entrena Isolation Forest con la parte de ajuste,",
         "elige los umbrales en validacion y evalua en la parte de prueba con el protocolo",
-        "de la seccion 15. La API evalua transacciones (POST /evaluar) con el modelo",
-        "entrenado y registra casos y revisiones; el flujo de n8n que los usa llega en la",
-        "fase 5. Solo las cifras calculadas con el conjunto real en el computador de",
-        "ejecucion (N3) son resultados; las de la muestra para pruebas no lo son.",
+        "de la seccion 15. n8n evalua cada transaccion del lote de demostracion con la API,",
+        "clasifica el nivel, registra el caso y recibe la revision humana; demostrar mide la",
+        "paridad con la tabla en Python y la latencia (flujo.json). La pagina de simulacion",
+        "llega en la fase 6. Solo las cifras calculadas con el conjunto real en el computador",
+        "de ejecucion (N3) son resultados; las de la muestra para pruebas no lo son.",
         "",
     ]
     return "\n".join(lineas)
@@ -463,6 +482,7 @@ def reunir_evidencia(
     capturas = _copiar_carpeta(en_curso / "capturas", carpeta / "capturas", texto=False)
     notas += _copiar_datos(en_curso, carpeta)
     notas += _copiar_modelo_y_evaluacion(en_curso, carpeta)
+    notas += _copiar_flujo(en_curso, carpeta)
     notas += _exportar_casos(Path(raiz), carpeta)
     notas.append(f"Capturas de pantalla copiadas: {capturas}.")
 

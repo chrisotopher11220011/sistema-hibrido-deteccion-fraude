@@ -53,7 +53,8 @@ Uso: ./fraude <comando>
               Entrena Isolation Forest con la parte de ajuste y elige los umbrales.
   evaluar [--muestra]
               Calcula las metricas, la comparativa, las figuras y el analisis de errores.
-  demostrar   Paso suelto. Se activa en la fase 5.
+  demostrar [--muestra]
+              Envia el lote de demostracion por n8n y por Python: paridad y latencia.
 
 Lo habitual: ./fraude todo, usar la pagina, ./fraude evidencia y ./fraude apagar.
 La guia paso a paso esta en EJECUTAR.md.

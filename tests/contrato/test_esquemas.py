@@ -16,6 +16,7 @@ ESPERADOS = {
     "lista_casos",
     "revision",
     "salud",
+    "error_flujo",
 }
 NIVELES = yaml.safe_load((RAIZ / "config" / "decision.yaml").read_text())["niveles"]
 
@@ -208,3 +209,19 @@ def test_error():
     assert not cumple(
         "error", {"id_transaccion": None, "error": {"tipo": "otro", "mensaje": "m", "detalles": []}}
     )
+
+
+def test_error_flujo_de_caso_no_registrado_exige_el_caso():
+    from contratos import cumple
+
+    error = {"tipo": "caso_no_registrado", "mensaje": "POST /casos no respondio", "detalles": []}
+    assert cumple("error_flujo", {"error": error, "caso": _caso_nuevo()})
+    assert not cumple("error_flujo", {"error": error})
+    assert not cumple("error_flujo", {"error": {**error, "tipo": "otro"}, "caso": _caso_nuevo()})
+
+
+def test_error_flujo_de_revision_no_registrada():
+    from contratos import cumple
+
+    error = {"tipo": "revision_no_registrada", "mensaje": "sin respuesta", "detalles": []}
+    assert cumple("error_flujo", {"id_transaccion": None, "error": error})

@@ -6,14 +6,15 @@ import os
 import sys
 from pathlib import Path
 
+from fraude.demostrar import demostrar
 from fraude.entrenar import entrenar
 from fraude.evaluar import evaluar
 from fraude.evidencia import comprobar_servicios, reunir_evidencia
 from fraude.preparar import preparar
 
 PASOS = ("preparar", "entrenar", "evaluar", "demostrar")
-# Paso -> fase en la que empieza a existir.
-PASOS_FUTUROS = {"demostrar": 5}
+# Paso -> fase en la que empieza a existir (vacio: todos los pasos existen).
+PASOS_FUTUROS: dict[str, int] = {}
 NO_REPORTABLE = " Muestra para pruebas: no reportable."
 
 
@@ -49,10 +50,21 @@ def _detalle_evaluar(informe: dict) -> str:
     return detalle + (NO_REPORTABLE if not informe.get("reportable", True) else "")
 
 
+def _detalle_demostrar(informe: dict) -> str:
+    paridad, latencia = informe["paridad"], informe["latencia_ms"]
+    detalle = (
+        f"Lote de {informe['lote']['total']} por n8n y por Python: paridad "
+        f"{paridad['coinciden']}/{paridad['total']}; latencia mediana {latencia['mediana']} ms, "
+        f"p95 {latencia['p95']} ms (flujo.json)."
+    )
+    return detalle + (NO_REPORTABLE if not informe.get("reportable", True) else "")
+
+
 AVISOS = {
     "preparar": "Obteniendo y verificando los datos",
     "entrenar": "Entrenando Isolation Forest con la parte de ajuste y eligiendo umbrales",
     "evaluar": "Evaluando: configuraciones, lineas base, bootstrap, semillas y temporal",
+    "demostrar": "Enviando el lote de demostracion por n8n; paridad y latencia",
 }
 
 
@@ -62,6 +74,7 @@ def _paso(nombre: str, muestra: bool) -> dict:
         "preparar": (preparar, _detalle_preparar),
         "entrenar": (entrenar, _detalle_entrenar),
         "evaluar": (evaluar, _detalle_evaluar),
+        "demostrar": (demostrar, _detalle_demostrar),
     }[nombre]
     print(f"[{nombre}] {AVISOS[nombre]}" + (" (muestra)..." if muestra else "..."))
     try:
@@ -127,6 +140,7 @@ def _analizador() -> argparse.ArgumentParser:
         "preparar": "Descarga y verifica los datos y los parte",
         "entrenar": "Entrena Isolation Forest y elige los umbrales en validacion",
         "evaluar": "Metricas de la seccion 15, figuras y analisis de errores",
+        "demostrar": "Envia el lote de demostracion por n8n: paridad con Python y latencia",
     }
     for paso, ayuda in ayudas.items():
         comandos.add_parser(paso, help=ayuda).add_argument(
@@ -154,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     if opciones.comando in PASOS_FUTUROS:
         print(_mensaje_futuro(opciones.comando))
         return 2
-    if opciones.comando in ("preparar", "entrenar", "evaluar"):
+    if opciones.comando in PASOS:
         return 0 if _paso(opciones.comando, opciones.muestra)["estado"] == "ok" else 1
     if opciones.comando == "evidencia":
         return _evidencia(_pasos_guardados())
