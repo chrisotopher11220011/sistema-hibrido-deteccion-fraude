@@ -36,7 +36,7 @@
 1. **Descarga directa del ARFF** con la biblioteca estándar, probando las dos direcciones en orden. No se usa `fetch_openml`, que omite `Time` por ser identificador de fila. El lector acepta también el CSV de Kaggle.
 2. **Parámetros de datos en `config/modelo.yaml`** (bloques `datos`, `particion`, `muestra` y `sinteticos`), para no ampliar el contrato 8.9.
 3. **Carpetas separadas:** `datos/crudos/` y `datos/preparados/` (reales), `datos/muestra/` (muestra) y `datos/sinteticos/` (ubicación).
-4. **Huella:** al descargar de OpenML se comprueba la MD5 publicada (en `config/modelo.yaml`). Además se calcula la SHA-256 del archivo y del contenido normalizado (sin `Time`). La primera ejecución las fija en `datos/crudos/huella.json`; las siguientes las verifican. `config/modelo.yaml` admite una lista de huellas SHA-256 conocidas, vacía hasta N3.
+4. **Huella:** al descargar de OpenML se comprueba la MD5 publicada (en `config/modelo.yaml`). Además se calcula la SHA-256 del archivo y del contenido normalizado (sin `Time`). La primera ejecución las fija en `datos/crudos/huella.json`; las siguientes las verifican. `config/modelo.yaml` admite una lista de huellas SHA-256 conocidas, vacía hasta N3. La muestra no fija huella: se regenera desde su configuración.
 5. **Partición determinista:** se recalcula siempre con la misma semilla y se compara con la guardada; `datos.json` dice si se creó, coincidió o cambió.
 6. **Regla de ubicación fuera de sus datos:** con `origen: "original"` queda «no evaluable», aunque la transacción traiga `ubicacion`.
 7. **Muestra:** `tareas preparar --muestra` y `tareas todo --muestra`; `./fraude` acepta la misma opción. `datos.json` marca `reportable: false`.

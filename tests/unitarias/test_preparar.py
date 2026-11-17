@@ -222,3 +222,16 @@ def test_cargar_preparados_devuelve_datos_y_partes_alineados(raiz):
 def test_cargar_preparados_sin_preparar_dice_que_hacer(raiz):
     with pytest.raises(ErrorDatos, match="preparar"):
         cargar_preparados(raiz)
+
+
+def test_cambiar_la_configuracion_de_la_muestra_no_bloquea_preparar(raiz):
+    """La muestra se regenera en cada ejecucion: no se le fija huella (revision de la fase 2)."""
+    preparar(raiz, muestra=True)
+    ruta = raiz / "config" / "modelo.yaml"
+    config = yaml.safe_load(ruta.read_text())
+    config["muestra"]["fraudes"] = 90
+    ruta.write_text(yaml.safe_dump(config))
+    informe = preparar(raiz, muestra=True)
+    assert informe["estado"] == "ok" and informe["fraudes"] == 90
+    assert informe["huellas"]["estado"] == "no_aplica_muestra"
+    assert informe["particion"]["estado"] == "recreada_por_cambio_de_configuracion"

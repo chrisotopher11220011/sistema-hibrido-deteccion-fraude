@@ -121,6 +121,10 @@ def _verificar_huellas(base: Path, archivo: Path, df: pd.DataFrame, config: dict
             "La huella del contenido no esta entre las conocidas de config/modelo.yaml: "
             f"{huellas['sha256_contenido']}"
         )
+    if base.name == "muestra":
+        # La muestra se regenera en cada ejecucion desde su configuracion: no se fija huella.
+        huellas["estado"] = "no_aplica_muestra"
+        return huellas
     guardada = base / "crudos" / "huella.json"
     if guardada.is_file():
         anterior = json.loads(guardada.read_text(encoding="utf-8"))
