@@ -3,7 +3,7 @@
 Documento vivo. Cada chat lo lee al empezar y lo actualiza al cerrar.
 
 - **Última actualización:** 2026-11-17 (UTC)
-- **Versión integrada en `main`:** 0.4.0 (Pull Request #7).
+- **Versión integrada en `main`:** 0.3.0. La 0.4.0 está en el Pull Request #7, **abierto**: CI en verde y revisión atendida, pero el entorno de Claude no recibió permiso para integrarlo. Lo integra Christopher desde GitHub.
 - **Etiquetas `v0.1.0`, `v0.2.0`, `v0.3.0` y `v0.4.0`:** **pendientes**. El entorno de Claude no puede crear etiquetas; las crea Christopher desde GitHub (*Releases > Draft a new release*): `v0.1.0` sobre el commit `54c0be4`, `v0.2.0` sobre el commit `0a20cd8` `v0.3.0` sobre el commit `2ff2987` y `v0.4.0` sobre el commit de integración del Pull Request #7.
 - **Fase en curso:** ninguna. La fase 4 está terminada; sigue la fase 5.
 - **Punto de prueba pendiente:** **B** (Omarchy 4): datos reales, entrenamiento y primeras métricas. Incluye lo que comprobaba el punto A.
@@ -15,7 +15,7 @@ Documento vivo. Cada chat lo lee al empezar y lo actualiza al cerrar.
 | 1. Cimientos | v0.1.0 | Terminada (N1 y N2). Espera el punto de prueba A | #1 |
 | 2. Datos y reglas | v0.2.0 | Terminada (N1 y N2 con la muestra). Los datos reales esperan N3 | #3 |
 | 3. Aprendizaje automático | v0.3.0 | Terminada (N1 y N2 con la muestra). Las métricas reales esperan el punto B (N3) | #5 |
-| 4. API y casos | v0.4.0 | Terminada (N1 y N2 con la muestra). Sin punto de prueba propio | #7 |
+| 4. API y casos | v0.4.0 | Terminada (N1 y N2 con la muestra), pendiente de integrar. Sin punto de prueba propio | #7 (abierto) |
 | 5. Flujos de n8n | v0.5.0 | Sin empezar | |
 | 6. Página de simulación | v0.6.0 | Sin empezar | |
 | 7. LLM local (opcional) | v0.7.0 | Sin empezar | |
@@ -88,7 +88,7 @@ Las que la especificación dejaba «para quien construya»:
 ## Límites del entorno de Claude (comprobados el 2026-11-17, fase 4)
 
 - Llega a GitHub (repositorio y API REST; no GraphQL) y a PyPI.
-- Puede subir ramas, abrir Pull Requests e integrarlos; **no** puede crear etiquetas ni publicaciones.
+- Puede subir ramas y abrir Pull Requests. En la fase 4 **no** recibió permiso para integrarlos (antes sí podía). No puede crear etiquetas ni publicaciones.
 - No llega a Docker Hub, Kaggle ni OpenML desde la consola. La lectura de páginas web sí llega a la API de OpenML (metadatos), no a los archivos.
 - Tiene el cliente de Docker pero no el servicio en marcha: Compose y n8n solo se prueban en N2.
 - La consola trabaja como `root`: las pruebas del guion deben ejecutarse también con un usuario normal (ver `CLAUDE.md`).
