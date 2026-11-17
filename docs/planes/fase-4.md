@@ -1,6 +1,6 @@
 # Fase 4 — API y casos: plan de implementación
 
-> **Para quien ejecute el plan:** se trabaja tarea por tarea con `superpowers:executing-plans`, prueba primero. Cada paso lleva casilla (`- [ ]`).
+> **Para quien ejecute el plan:** se trabaja tarea por tarea con `superpowers:executing-plans`, prueba primero. Cada paso lleva casilla (`- [x]`).
 
 **Meta:** que la API sirva `POST /evaluar` con el contrato 8.3, cargue (y recargue) el modelo que deja `entrenar`, registre casos en SQLite con `POST /casos`, `GET /casos` y `POST /casos/{id}/revision`, y que los contratos de la sección 8 queden como esquemas JSON en `docs/contratos/` con pruebas de contrato.
 
@@ -63,8 +63,8 @@
 **Interfaces:**
 - Produce: fixture `validar(nombre: str, instancia) -> None` (lanza `jsonschema.ValidationError`), y `ejemplos_spec() -> dict[str, dict]` que extrae de `docs/spec.md` los bloques JSON de 8.2 y 8.3.
 
-- [ ] Prueba: los ejemplos 8.2 y 8.3 de `docs/spec.md` cumplen `transaccion` y `evaluacion`; cada esquema es válido en 2020-12; los enumerados de `nivel` coinciden con `config/decision.yaml`; `transaccion` rechaza `Class`, `origen` desconocido y `variables` incompletas; `evaluacion` rechaza campos extra en la raíz y en `modelo` salvo `contribuciones`.
-- [ ] Ver fallar, escribir los esquemas, ver pasar, commit `test(contratos): ...` / `docs(contratos): ...`.
+- [x] Prueba: los ejemplos 8.2 y 8.3 de `docs/spec.md` cumplen `transaccion` y `evaluacion`; cada esquema es válido en 2020-12; los enumerados de `nivel` coinciden con `config/decision.yaml`; `transaccion` rechaza `Class`, `origen` desconocido y `variables` incompletas; `evaluacion` rechaza campos extra en la raíz y en `modelo` salvo `contribuciones`.
+- [x] Ver fallar, escribir los esquemas, ver pasar, commit `test(contratos): ...` / `docs(contratos): ...`.
 
 ### Tarea 2: servicio del modelo
 
@@ -74,7 +74,7 @@
 - Produce: `class ServicioModelo(raiz: Path, modo: str = "auto")` con `estado() -> dict` (`cargado`, `fuente`, `version`, `reportable`, `umbrales`, `motivo`), `disponible() -> bool`, `evaluar(fila: dict[str, float]) -> dict` (la parte `modelo` del 8.3, con `contribuciones` si hay anomalía) y `version() -> str | None`.
 - Produce: `contribuciones.Explicador(bosque)` con `.contribuciones(X, variables, k)`; la función `contribuciones(...)` existente lo usa.
 
-- [ ] Pruebas: sin artefacto → `cargado: False` con motivo que menciona `entrenar`; con artefacto de muestra → `fuente: muestra`, `reportable: False`; `auto` prefiere el real; reentrenar cambia la versión sin crear un servicio nuevo; huella alterada o variables distintas de la configuración → no cargado con motivo; `anomalia` y `anomalia_alta` siguen exactamente los umbrales de `modelo.json`; contribuciones solo con anomalía y con `k` de la configuración.
+- [x] Pruebas: sin artefacto → `cargado: False` con motivo que menciona `entrenar`; con artefacto de muestra → `fuente: muestra`, `reportable: False`; `auto` prefiere el real; reentrenar cambia la versión sin crear un servicio nuevo; huella alterada o variables distintas de la configuración → no cargado con motivo; `anomalia` y `anomalia_alta` siguen exactamente los umbrales de `modelo.json`; contribuciones solo con anomalía y con `k` de la configuración.
 
 ### Tarea 3: `/evaluar` y `/salud`
 
@@ -83,17 +83,23 @@
 **Interfaces:**
 - Produce: `evaluacion.evaluar_transaccion(t: Transaccion, config_reglas: dict, servicio: ServicioModelo) -> dict` (lanza `ModeloNoDisponible`); `errores.cuerpo_error(tipo, mensaje, detalles, id_transaccion) -> dict`.
 
-- [ ] Pruebas: ejemplo 8.2 → 200 que cumple `evaluacion`; regla de ubicación sintética activada con razón; original sin `variables` → modelo no evaluable; con `variables` y sin modelo → 503 `modelo_no_disponible` que cumple `error`; entradas de la revisión dirigida 2 → 422 `entrada_invalida` con `id_transaccion` recuperado; `/salud` cumple `salud` con y sin modelo; recarga tras entrenar (revisión dirigida 1).
+- [x] Pruebas: ejemplo 8.2 → 200 que cumple `evaluacion`; regla de ubicación sintética activada con razón; original sin `variables` → modelo no evaluable; con `variables` y sin modelo → 503 `modelo_no_disponible` que cumple `error`; entradas de la revisión dirigida 2 → 422 `entrada_invalida` con `id_transaccion` recuperado; `/salud` cumple `salud` con y sin modelo; recarga tras entrenar (revisión dirigida 1).
 
 ### Tarea 4: registro de casos
 
 **Archivos:** Crear `src/fraude/registro.py` (`RegistroCasos(ruta)` con `crear(dict) -> dict`, `listar(estado, limite) -> dict`, `revisar(id_caso, dict) -> dict`), `src/fraude/casos.py` (modelos Pydantic `CasoNuevo`, `Revision`); rutas en `api.py`; pruebas unitarias y de contrato.
 
-- [ ] Pruebas: `sin_alerta` → `cerrado`; otros niveles → `pendiente_revision`/`pendiente`; caso `error_evaluacion` sin datos de la transacción se registra (revisión dirigida 5); un nivel distinto de `error_evaluacion` sin `senales` → 422; revisión → `revisado` con fecha UTC; 404 y 409 sin cambiar el caso (revisión dirigida 4); `GET /casos` filtra y ordena; todo cumple `caso` y `lista_casos`; los datos sobreviven a una app nueva sobre la misma base.
+- [x] Pruebas: `sin_alerta` → `cerrado`; otros niveles → `pendiente_revision`/`pendiente`; caso `error_evaluacion` sin datos de la transacción se registra (revisión dirigida 5); un nivel distinto de `error_evaluacion` sin `senales` → 422; revisión → `revisado` con fecha UTC; 404 y 409 sin cambiar el caso (revisión dirigida 4); `GET /casos` filtra y ordena; todo cumple `caso` y `lista_casos`; los datos sobreviven a una app nueva sobre la misma base.
 
 ### Tarea 5: exportación a la evidencia, CI y documentos
 
 **Archivos:** `src/fraude/evidencia.py` (`casos.csv`, `revisiones.csv`), `tests/punta_a_punta/comprobar_api.py` (biblioteca estándar), `.github/workflows/ci.yml`, ADR 0013, `docs/architecture.md`, versión 0.4.0 en `pyproject.toml`, `__init__.py`, `compose.yaml`, `README.md`, `EJECUTAR.md`, `CHANGELOG.md`, `docs/ESTADO.md`, `docs/supuestos.md`.
 
-- [ ] Pruebas: `evidencia` con base → los dos CSV con cabeceras fijas; sin base → anotado en el resumen.
-- [ ] CI: tras `todo --muestra`, `comprobar_api.py` comprueba que la API cargó el modelo recién entrenado, evalúa, registra y revisa un caso y recibe 422 con una entrada inválida; luego `evidencia` y comprobación de `casos.csv`.
+- [x] Pruebas: `evidencia` con base → los dos CSV con cabeceras fijas; sin base → anotado en el resumen.
+- [x] CI: tras `todo --muestra`, `comprobar_api.py` comprueba que la API cargó el modelo recién entrenado, evalúa, registra y revisa un caso y recibe 422 con una entrada inválida; luego `evidencia` y comprobación de `casos.csv`.
+
+## Cierre (2026-11-17, UTC)
+
+- N1: 331 pruebas en verde (6 omitidas como `root`; `test_guion.py` con usuario normal: 24 pasan, 3 omitidas).
+- N2: CI en verde, ejecución 44110435779, con `comprobar_api.py` y la exportación de casos.
+- Revisión de código con subagente de contexto limpio: cinco hallazgos, cuatro de código corregidos con su prueba (tipos estrictos, números finitos en casos, cuerpo de error en 404/405, carga en una sola lectura) y uno de proceso (este cierre).

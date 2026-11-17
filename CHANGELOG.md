@@ -26,6 +26,10 @@ Fase 4, API y casos. Lo comprobado en la CI usa la muestra para pruebas: confirm
 - `contribuciones.Explicador` permite reutilizar el explicador SHAP de un modelo cargado.
 - Dependencia de desarrollo nueva: `jsonschema`.
 
+### Corregido
+
+- Hallazgos de la revisión de código, antes de integrar: la transacción y el caso ya no convierten booleanos ni textos en números (`"monto": true` daba 200 y podía acabar en `sin_alerta`); los NaN e infinitos dentro de las señales de un caso se rechazan en lugar de guardarse como `null`; las rutas y métodos inexistentes responden con el cuerpo de error (`ruta_no_disponible`); la API comprueba y carga el modelo desde una sola lectura del archivo (N1; N2).
+
 ## [0.3.0] - 2026-11-17
 
 Fase 3, aprendizaje automático. Todo lo comprobado aquí usa la muestra para pruebas: confirma que el procedimiento funciona, no mide la detección de fraude. Las cifras reales salen solo de N3 (punto de prueba B).
@@ -85,5 +89,7 @@ Fase 1, cimientos. Sin datos, reglas, modelo ni página todavía: esta versión 
 - Archivos de configuración `config/reglas.yaml`, `config/modelo.yaml` y `config/decision.yaml`.
 
 [Sin publicar]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/compare/main...HEAD
+[0.4.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/pull/7
+[0.3.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/pull/5
 [0.2.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/pull/3
 [0.1.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/pull/1
