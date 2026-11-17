@@ -21,5 +21,5 @@ Fase 1, cimientos. Sin datos, reglas, modelo ni página todavía: esta versión 
 - Integración continua en GitHub Actions: estilo, pruebas unitarias, `shellcheck`, construcción de imágenes y flujo `ping` de punta a punta.
 - Archivos de configuración `config/reglas.yaml`, `config/modelo.yaml` y `config/decision.yaml`.
 
-[Sin publicar]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/releases/tag/v0.1.0
+[Sin publicar]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/compare/54c0be4...HEAD
+[0.1.0]: https://github.com/chrisotopher11220011/sistema-hibrido-deteccion-fraude/pull/1
