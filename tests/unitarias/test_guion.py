@@ -340,11 +340,27 @@ def test_una_sesion_nueva_no_arrastra_datos_de_la_anterior(guion):
     (en_curso / "eda").mkdir(parents=True)
     (en_curso / "eda" / "vieja.png").write_bytes(b"x")
     (en_curso / "datos.json").write_text("{}")
+    for nombre in ("modelo.json", "metricas.json", "comparativa.md"):
+        (en_curso / nombre).write_text("{}")
+    for nombre in ("figuras", "analisis_errores"):
+        (en_curso / nombre).mkdir()
+        (en_curso / nombre / "viejo").write_text("x")
 
     guion.ejecutar("todo")
 
     assert not (en_curso / "datos.json").exists()
     assert not (en_curso / "eda").exists()
+    for nombre in ("modelo.json", "metricas.json", "comparativa.md", "figuras", "analisis_errores"):
+        assert not (en_curso / nombre).exists(), nombre
+
+
+def test_entrenar_y_evaluar_sueltos_con_muestra(guion):
+    guion.ejecutar("entrenar", "--muestra")
+    guion.ejecutar("evaluar", "--muestra")
+
+    llamadas = guion.llamadas()
+    assert any("tareas entrenar --muestra" in linea for linea in llamadas)
+    assert any("tareas evaluar --muestra" in linea for linea in llamadas)
 
 
 def test_la_ayuda_explica_la_muestra(guion):

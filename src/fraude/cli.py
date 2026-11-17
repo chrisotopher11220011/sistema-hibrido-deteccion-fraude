@@ -6,12 +6,15 @@ import os
 import sys
 from pathlib import Path
 
+from fraude.entrenar import entrenar
+from fraude.evaluar import evaluar
 from fraude.evidencia import comprobar_servicios, reunir_evidencia
 from fraude.preparar import preparar
 
 PASOS = ("preparar", "entrenar", "evaluar", "demostrar")
 # Paso -> fase en la que empieza a existir.
-PASOS_FUTUROS = {"entrenar": 3, "evaluar": 3, "demostrar": 5}
+PASOS_FUTUROS = {"demostrar": 5}
+NO_REPORTABLE = " Muestra para pruebas: no reportable."
 
 
 def _raiz() -> Path:
@@ -26,29 +29,58 @@ def _mensaje_futuro(paso: str) -> str:
     return f"El paso «{paso}» llega en la fase {PASOS_FUTUROS[paso]}; en esta version no hace nada."
 
 
-def _paso_preparar(muestra: bool) -> dict:
-    """Ejecuta `preparar`. Cualquier fallo se registra y no detiene `todo`."""
-    print("[preparar] Obteniendo y verificando los datos" + (" (muestra)..." if muestra else "..."))
-    try:
-        informe = preparar(_raiz(), muestra=muestra)
-    except Exception as error:  # noqa: BLE001 - todo debe terminar siempre con evidencia
-        detalle = f"{type(error).__name__}: {error}"
-        print(f"[preparar] ERROR: {detalle}")
-        return {"paso": "preparar", "estado": "fallo", "detalle": detalle}
-    detalle = (
+def _detalle_preparar(informe: dict) -> str:
+    return (
         f"Fuente {informe['fuente']}: {informe['filas']} transacciones, "
         f"{informe['fraudes']} fraudes; particion {informe['particion']['estado']}."
     )
-    print(f"[preparar] Listo. {detalle}")
-    return {"paso": "preparar", "estado": "ok", "detalle": detalle}
+
+
+def _detalle_entrenar(informe: dict) -> str:
+    detalle = f"Modelo {informe['version']}; umbrales elegidos en validacion (modelo.json)."
+    return detalle + (NO_REPORTABLE if not informe.get("reportable", True) else "")
+
+
+def _detalle_evaluar(informe: dict) -> str:
+    detalle = (
+        f"Protocolo de la seccion 15 en {informe['duracion_s']} s: metricas.json, "
+        "comparativa.md, figuras/ y analisis_errores/ (validacion)."
+    )
+    return detalle + (NO_REPORTABLE if not informe.get("reportable", True) else "")
+
+
+AVISOS = {
+    "preparar": "Obteniendo y verificando los datos",
+    "entrenar": "Entrenando Isolation Forest con la parte de ajuste y eligiendo umbrales",
+    "evaluar": "Evaluando: configuraciones, lineas base, bootstrap, semillas y temporal",
+}
+
+
+def _paso(nombre: str, muestra: bool) -> dict:
+    """Ejecuta un paso. Cualquier fallo se registra y no detiene `todo`."""
+    funcion, detallar = {
+        "preparar": (preparar, _detalle_preparar),
+        "entrenar": (entrenar, _detalle_entrenar),
+        "evaluar": (evaluar, _detalle_evaluar),
+    }[nombre]
+    print(f"[{nombre}] {AVISOS[nombre]}" + (" (muestra)..." if muestra else "..."))
+    try:
+        informe = funcion(_raiz(), muestra=muestra)
+    except Exception as error:  # noqa: BLE001 - todo debe terminar siempre con evidencia
+        detalle = f"{type(error).__name__}: {error}"
+        print(f"[{nombre}] ERROR: {detalle}")
+        return {"paso": nombre, "estado": "fallo", "detalle": detalle}
+    detalle = detallar(informe)
+    print(f"[{nombre}] Listo. {detalle}")
+    return {"paso": nombre, "estado": "ok", "detalle": detalle}
 
 
 def _ejecutar_pasos(muestra: bool = False) -> list[dict]:
     """Ejecuta, en orden, los pasos que ya existen y anota los que llegan despues."""
     pasos = []
     for paso in PASOS:
-        if paso == "preparar":
-            pasos.append(_paso_preparar(muestra))
+        if paso not in PASOS_FUTUROS:
+            pasos.append(_paso(paso, muestra))
             continue
         print(f"[{paso}] {_mensaje_futuro(paso)}")
         pasos.append({"paso": paso, "estado": "no_disponible", "detalle": _mensaje_futuro(paso)})
@@ -91,8 +123,15 @@ def _analizador() -> argparse.ArgumentParser:
     )
     comandos = analizador.add_subparsers(dest="comando", metavar="comando")
     ayuda_muestra = "Usa la muestra para pruebas en lugar del conjunto real (no reportable)"
-    preparar_ = comandos.add_parser("preparar", help="Descarga y verifica los datos y los parte")
-    preparar_.add_argument("--muestra", action="store_true", help=ayuda_muestra)
+    ayudas = {
+        "preparar": "Descarga y verifica los datos y los parte",
+        "entrenar": "Entrena Isolation Forest y elige los umbrales en validacion",
+        "evaluar": "Metricas de la seccion 15, figuras y analisis de errores",
+    }
+    for paso, ayuda in ayudas.items():
+        comandos.add_parser(paso, help=ayuda).add_argument(
+            "--muestra", action="store_true", help=ayuda_muestra
+        )
     for paso, fase in PASOS_FUTUROS.items():
         comandos.add_parser(paso, help=f"Disponible desde la fase {fase}")
     comandos.add_parser("evidencia", help="Reune los archivos de evidencia")
@@ -115,8 +154,8 @@ def main(argv: list[str] | None = None) -> int:
     if opciones.comando in PASOS_FUTUROS:
         print(_mensaje_futuro(opciones.comando))
         return 2
-    if opciones.comando == "preparar":
-        return 0 if _paso_preparar(opciones.muestra)["estado"] == "ok" else 1
+    if opciones.comando in ("preparar", "entrenar", "evaluar"):
+        return 0 if _paso(opciones.comando, opciones.muestra)["estado"] == "ok" else 1
     if opciones.comando == "evidencia":
         return _evidencia(_pasos_guardados())
     pasos = _ejecutar_pasos(opciones.muestra)

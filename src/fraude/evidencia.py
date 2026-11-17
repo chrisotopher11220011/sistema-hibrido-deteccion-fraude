@@ -228,6 +228,52 @@ def _copiar_datos(en_curso: Path, carpeta: Path) -> list[str]:
     return [nota]
 
 
+def _leer(ruta: Path) -> dict | None:
+    try:
+        return json.loads(ruta.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _copiar_modelo_y_evaluacion(en_curso: Path, carpeta: Path) -> list[str]:
+    """Copia lo que dejan `entrenar` y `evaluar` y resume su estado."""
+    notas = []
+    for nombre in ("modelo.json", "metricas.json", "comparativa.md"):
+        if (en_curso / nombre).is_file():
+            shutil.copyfile(en_curso / nombre, carpeta / nombre)
+    for nombre in ("figuras", "analisis_errores"):
+        if (en_curso / nombre).is_dir():
+            _copiar_carpeta(en_curso / nombre, carpeta / nombre, texto=False)
+
+    modelo = _leer(en_curso / "modelo.json")
+    if modelo is None:
+        notas.append("Sin modelo.json: el paso entrenar no se ejecuto en esta sesion.")
+    elif modelo.get("estado") != "ok":
+        notas.append(f"Modelo: entrenar no termino bien ({modelo.get('error', 'sin detalle')}).")
+    else:
+        nota = f"Modelo: version {modelo.get('version')}, umbrales elegidos en validacion."
+        if not modelo.get("reportable", False):
+            nota += " Entrenado con la muestra para pruebas: no reportable."
+        notas.append(nota)
+
+    metricas = _leer(en_curso / "metricas.json")
+    if metricas is None:
+        notas.append("Sin metricas.json: el paso evaluar no se ejecuto en esta sesion.")
+    elif metricas.get("estado") != "ok":
+        notas.append(
+            f"Evaluacion: evaluar no termino bien ({metricas.get('error', 'sin detalle')})."
+        )
+    else:
+        nota = (
+            "Evaluacion: metricas.json, comparativa.md y figuras/ con la parte de prueba; "
+            "analisis_errores/ con la de validacion."
+        )
+        if not metricas.get("reportable", False):
+            nota += " Calculado con la muestra para pruebas: no reportable, no es un resultado."
+        notas.append(nota)
+    return notas
+
+
 def _resumen(
     momento: datetime,
     commit: str,
@@ -265,9 +311,10 @@ def _resumen(
         "",
         "## Alcance",
         "",
-        "Esta version comprueba el arranque y prepara los datos (verificacion, particion,",
-        "analisis exploratorio de la parte de ajuste y datos sinteticos de ubicacion).",
-        "No contiene metricas de deteccion de fraude: el modelo llega en la fase 3.",
+        "Esta version prepara los datos, entrena Isolation Forest con la parte de ajuste,",
+        "elige los umbrales en validacion y evalua en la parte de prueba con el protocolo",
+        "de la seccion 15. Solo las cifras calculadas con el conjunto real en el computador",
+        "de ejecucion (N3) son resultados; las de la muestra para pruebas no lo son.",
         "",
     ]
     return "\n".join(lineas)
@@ -307,6 +354,7 @@ def reunir_evidencia(
         notas.append("Sin registros de los servicios: los guarda ./fraude desde el anfitrion.")
     capturas = _copiar_carpeta(en_curso / "capturas", carpeta / "capturas", texto=False)
     notas += _copiar_datos(en_curso, carpeta)
+    notas += _copiar_modelo_y_evaluacion(en_curso, carpeta)
     notas.append(f"Capturas de pantalla copiadas: {capturas}.")
 
     observaciones = en_curso / "OBSERVACIONES.md"
